@@ -1,0 +1,14 @@
+# Ignore artifacts
+node_modules
+.expo
+dist
+build
+*.lock
+
+# Ignore generated files
+*.d.ts
+nativewind-env.d.ts
+
+# Ignore config files that have specific formatting
+*.json
+!.prettierrc

@@ -1,53 +1,37 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Theme Constants (Legacy compatibility)
+ * =======================================
+ * This file provides backward compatibility with existing components.
+ * For new code, import directly from @/config/colors or @/config/typography
  */
 
-import { Platform } from 'react-native';
+import { Colors as AppColors } from '@/config/colors';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
-
+// Light mode only (no dark mode)
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+    text: AppColors.text.primary,
+    background: AppColors.background,
+    tint: AppColors.primary,
+    icon: AppColors.gray[600],
+    tabIconDefault: AppColors.gray[500],
+    tabIconSelected: AppColors.primary,
   },
+  // Keep dark for compatibility but use same values
   dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+    text: AppColors.text.primary,
+    background: AppColors.background,
+    tint: AppColors.primary,
+    icon: AppColors.gray[600],
+    tabIconDefault: AppColors.gray[500],
+    tabIconSelected: AppColors.primary,
   },
 };
 
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-  },
-});
+// Font family names for compatibility
+export const Fonts = {
+  sans: 'Poppins_400Regular',
+  serif: 'Poppins_400Regular',
+  rounded: 'Poppins_500Medium',
+  mono: 'Poppins_400Regular',
+};
