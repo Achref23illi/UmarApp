@@ -7,4 +7,10 @@ module.exports = defineConfig([
   {
     ignores: ['dist/*'],
   },
+  {
+    rules: {
+      // Prettier handles formatting
+      'prettier/prettier': 'warn',
+    },
+  },
 ]);

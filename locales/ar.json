@@ -1,0 +1,266 @@
+{
+  "common": {
+    "appName": "UmarApp",
+    "welcome": "مرحباً",
+    "home": "الرئيسية",
+    "explore": "استكشاف",
+    "settings": "الإعدادات",
+    "loading": "جاري التحميل...",
+    "error": "خطأ",
+    "success": "نجاح",
+    "cancel": "إلغاء",
+    "confirm": "تأكيد",
+    "save": "حفظ",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "back": "رجوع",
+    "next": "التالي",
+    "done": "تم",
+    "retry": "إعادة المحاولة",
+    "or": "أو",
+    "continueWith": "المتابعة عبر",
+    "today": "اليوم",
+    "points": "نقاط",
+    "badges": "شارات",
+    "premium": "بريميوم"
+  },
+  "welcome": {
+    "slides": {
+      "1": {
+        "title": "الصلاة مفتاح الفلاح",
+        "subtitle": "احصل على مواقيت صلاة دقيقة حسب موقعك ولا تفوت صلاة بعد اليوم."
+      },
+      "2": {
+        "title": "تواصل مع خالقك",
+        "subtitle": "اقرأ القرآن مع التفسير والترجمة واستمع لتلاوات خاشعة من أشهر القراء."
+      },
+      "3": {
+        "title": "السكينة في الجماعة",
+        "subtitle": "اكتشف المساجد القريبة والأماكن الحلال وانضم إلى مجتمع داعم من المؤمنين."
+      }
+    },
+    "getStarted": "ابدأ الآن",
+    "next": "التالي",
+    "skip": "تخطى",
+    "alreadyHaveAccount": "لدي حساب بالفعل"
+  },
+  "auth": {
+    "login": {
+      "title": "مرحباً بعودتك",
+      "subtitle": "سجّل دخولك لمتابعة رحلتك",
+      "email": "البريد الإلكتروني",
+      "emailPlaceholder": "أدخل بريدك الإلكتروني",
+      "password": "كلمة المرور",
+      "passwordPlaceholder": "أدخل كلمة المرور",
+      "forgotPassword": "نسيت كلمة المرور؟",
+      "signIn": "تسجيل الدخول",
+      "noAccount": "ليس لديك حساب؟",
+      "signUp": "إنشاء حساب"
+    },
+    "register": {
+      "title": "إنشاء حساب",
+      "subtitle": "انضم إلى مجتمعنا من المؤمنين",
+      "name": "الاسم الكامل",
+      "namePlaceholder": "أدخل اسمك",
+      "email": "البريد الإلكتروني",
+      "emailPlaceholder": "أدخل بريدك الإلكتروني",
+      "password": "كلمة المرور",
+      "passwordPlaceholder": "أنشئ كلمة مرور",
+      "confirmPassword": "تأكيد كلمة المرور",
+      "confirmPasswordPlaceholder": "أكد كلمة المرور",
+      "signUp": "إنشاء الحساب",
+      "haveAccount": "لديك حساب بالفعل؟",
+      "signIn": "تسجيل الدخول",
+      "terms": "بإنشاء حساب، فإنك توافق على",
+      "termsLink": "الشروط وسياسة الخصوصية"
+    },
+    "social": {
+      "google": "المتابعة عبر Google",
+      "apple": "المتابعة عبر Apple",
+      "phone": "المتابعة عبر الهاتف"
+    },
+    "forgotPassword": {
+      "title": "إعادة تعيين كلمة المرور",
+      "subtitle": "أدخل بريدك الإلكتروني لاستلام رابط إعادة التعيين",
+      "email": "البريد الإلكتروني",
+      "emailPlaceholder": "أدخل بريدك الإلكتروني",
+      "send": "إرسال الرابط",
+      "backToLogin": "العودة لتسجيل الدخول"
+    },
+    "verification": {
+      "title": "التحقق",
+      "subtitle": "أدخل الرمز المرسل إلى بريدك الإلكتروني",
+      "resend": "إعادة إرسال الرمز",
+      "verify": "تحقق"
+    }
+  },
+  "home": {
+    "title": "الرئيسية",
+    "subtitle": "مرحباً بك في مساحتك الروحية",
+    "greeting": "السلام عليكم"
+  },
+  "prayer": {
+    "elapsed": "مضى",
+    "remaining": "متبقي",
+    "startedAt": "بدأت {{prayer}} في {{time}}",
+    "upcomingAt": "{{prayer}} في {{time}}",
+    "fajr": "الفجر",
+    "dhuhr": "الظهر",
+    "asr": "العصر",
+    "maghrib": "المغرب",
+    "isha": "العشاء",
+    "nextPrayer": "الصلاة القادمة",
+    "currentPrayer": "الصلاة الحالية",
+    "prayerTimes": "مواقيت الصلاة",
+    "locationDenied": "تم رفض الوصول إلى الموقع",
+    "unableToGetLocation": "تعذر الحصول على الموقع",
+    "loadingLocation": "جاري تحميل الموقع...",
+    "errorFetchingData": "خطأ في جلب البيانات",
+    "today": "اليوم"
+  },
+  "quran": {
+    "title": "القرآن",
+    "continueReading": "متابعة القراءة",
+    "readQuran": "اقرأ القرآن",
+    "startReading": "ابدأ القراءة",
+    "beginJourney": "ابدأ رحلتك الروحية اليوم",
+    "surah": "سورة",
+    "ayah": "آية",
+    "juz": "جزء",
+    "page": "صفحة",
+    "verses": "آيات",
+    "library": "المكتبة",
+    "arabic": "عربي",
+    "translation": "ترجمة",
+    "transliteration": "نقل حرفي",
+    "audio": "صوت",
+    "bookmark": "حفظ",
+    "bookmarked": "تم الحفظ",
+    "share": "مشاركة",
+    "copy": "نسخ",
+    "copied": "تم النسخ"
+  },
+  "dua": {
+    "title": "الأدعية",
+    "duaOfTheDay": "دعاء اليوم",
+    "noDuasAvailable": "لا توجد أدعية متاحة.",
+    "categories": "الفئات",
+    "morning": "الصباح",
+    "evening": "المساء",
+    "protection": "الحماية",
+    "forgiveness": "الاستغفار"
+  },
+  "challenges": {
+    "title": "التحديات",
+    "dailyChallenges": "التحديات اليومية",
+    "reward": "المكافأة",
+    "completed": "مكتمل",
+    "inProgress": "قيد التنفيذ"
+  },
+  "profile": {
+    "title": "الملف الشخصي",
+    "editProfile": "تعديل الملف",
+    "settings": "الإعدادات",
+    "notifications": "الإشعارات",
+    "prayerSettings": "إعدادات الصلاة",
+    "goPremium": "الترقية للبريميوم",
+    "helpSupport": "المساعدة والدعم",
+    "about": "حول",
+    "signOut": "تسجيل الخروج",
+    "points": "نقاط",
+    "badges": "شارات",
+    "premium": "بريميوم"
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "appearance": "المظهر",
+    "language": "اللغة",
+    "notifications": "الإشعارات",
+    "privacy": "الخصوصية",
+    "about": "حول",
+    "theme": {
+      "light": "فاتح",
+      "dark": "داكن",
+      "system": "النظام"
+    }
+  },
+  "language": {
+    "title": "اللغة",
+    "select": "اختر اللغة",
+    "english": "الإنجليزية",
+    "french": "الفرنسية",
+    "arabic": "العربية",
+    "current": "اللغة الحالية"
+  },
+  "mosques": {
+    "title": "المساجد",
+    "findNearby": "البحث في الجوار",
+    "directions": "الاتجاهات",
+    "distance": "المسافة",
+    "noMosquesFound": "لم يتم العثور على مساجد"
+  },
+  "qibla": {
+    "title": "القبلة",
+    "direction": "الاتجاه",
+    "compass": "البوصلة",
+    "calibrate": "معايرة"
+  },
+  "events": {
+    "title": "الفعاليات",
+    "upcoming": "القادمة",
+    "past": "السابقة",
+    "noEvents": "لا توجد فعاليات"
+  },
+  "quiz": {
+    "title": "اختبار",
+    "start": "ابدأ",
+    "score": "النتيجة",
+    "correct": "صحيح",
+    "incorrect": "خطأ",
+    "nextQuestion": "السؤال التالي",
+    "finish": "إنهاء"
+  },
+  "jeneza": {
+    "title": "الجنازة",
+    "announcements": "الإعلانات",
+    "prayers": "الصلوات"
+  },
+  "calendar": {
+    "title": "التقويم الهجري",
+    "hijriDate": "التاريخ الهجري",
+    "gregorianDate": "التاريخ الميلادي",
+    "importantDates": "تواريخ مهمة",
+    "converter": "محول التاريخ"
+  },
+  "tasbih": {
+    "title": "التسبيح",
+    "count": "العدد",
+    "reset": "إعادة تعيين",
+    "target": "الهدف"
+  },
+  "namesOfAllah": {
+    "title": "أسماء الله الحسنى",
+    "meaning": "المعنى",
+    "benefits": "الفوائد"
+  },
+  "features": {
+    "title": "الميزات",
+    "prayer": "الصلاة",
+    "quran": "القرآن",
+    "mosques": "المساجد",
+    "qibla": "القبلة",
+    "events": "الفعاليات",
+    "quiz": "اختبار",
+    "jeneza": "الجنازة",
+    "tasbih": "التسبيح",
+    "calendar": "التقويم",
+    "namesOfAllah": "أسماء الله"
+  },
+  "errors": {
+    "networkError": "خطأ في الشبكة",
+    "somethingWentWrong": "حدث خطأ ما",
+    "tryAgain": "حاول مرة أخرى",
+    "noConnection": "لا يوجد اتصال بالإنترنت",
+    "checkConnection": "تحقق من اتصالك وحاول مرة أخرى"
+  }
+}
