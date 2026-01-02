@@ -1,6 +1,14 @@
-# Welcome to your Expo app 👋
+# UmarApp 🕌
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+An Islamic app built with [Expo](https://expo.dev) using a development build.
+
+> ⚠️ **Important:** This app requires a **development build** and does **NOT** work with Expo Go. It is currently built for **iOS only**.
+
+## Prerequisites
+
+- macOS with Xcode installed
+- iOS Simulator (iPhone)
+- Node.js and npm
 
 ## Get started
 
@@ -10,18 +18,32 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npm install
    ```
 
-2. Start the app
+2. Install iOS pods
 
    ```bash
-   npx expo start
+   cd ios && pod install && cd ..
    ```
 
-In the output, you'll find options to open the app in a
+3. Build and run the development build on iOS Simulator
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+   ```bash
+   npx expo run:ios
+   ```
+
+   Or start the development server and press `i` to open in iOS Simulator:
+
+   ```bash
+   npx expo start --dev-client
+   ```
+
+## Platform Support
+
+| Platform | Status |
+|----------|--------|
+| iOS      | ✅ Supported |
+| Android  | ❌ Not supported |
+
+> **Note:** This app uses native modules that require a development build. Expo Go is not supported.
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
