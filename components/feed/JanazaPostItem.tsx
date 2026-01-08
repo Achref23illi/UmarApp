@@ -5,13 +5,17 @@ import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
 
+import { Images } from '@/config/assets';
+import { Colors } from '@/config/colors';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
 import { Post, socialService } from '@/services/socialService';
-import { useAppSelector } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { setInAgenda, setPinned as setPinnedAction } from '@/store/slices/agendaSlice';
+import { toast } from '@/components/ui/Toast';
 
 interface JanazaPostItemProps {
   post: Post;
@@ -24,7 +28,11 @@ export function JanazaPostItem({ post, onDelete }: JanazaPostItemProps) {
   const { t } = useTranslation();
   const { colors, isDark } = useTheme();
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
+  const dispatch = useAppDispatch();
   const [currentUser, setCurrentUser] = React.useState<any>(null);
+  const [meritVisible, setMeritVisible] = React.useState(false);
+  const [isPinned, setIsPinned] = React.useState(!!post.pinned);
+  const [inAgenda, setInAgendaState] = React.useState(!!post.inAgenda);
 
   React.useEffect(() => {
     socialService.getUser().then(setCurrentUser);
@@ -56,13 +64,18 @@ export function JanazaPostItem({ post, onDelete }: JanazaPostItemProps) {
     }
   };
 
-  const { deceasedName, prayerTime, mosqueName, mosqueLocation, cemeteryName } = post.janazaData;
+  const { deceasedName, prayerTime, mosqueName, mosqueLocation, mosqueAddress, cemeteryName, cemeteryAddress, prayerDate, isRepatriation } = post.janazaData;
+  const tags = Array.isArray(post.tags) ? post.tags : [];
 
   const handleShare = () => {
-    socialService.sharePost(`${t('feed.janaza')}: ${deceasedName}. ${prayerTime} ${t('common.at')} ${mosqueName}.`); 
+    socialService.sharePost(`${t('feed.janaza')}: ${deceasedName}. ${prayerTime} ${t('common.at')} ${mosqueName}. ${tags.join(' ')}`); 
   };
 
   const openDirections = () => {
+      if (!mosqueLocation) {
+        toast.show({ type: 'info', message: t('feed.locationNotAvailable') });
+        return;
+      }
       const { lat, lng } = mosqueLocation;
       const url = Platform.select({
         ios: `maps:?daddr=${lat},${lng}&dirflg=d`,
@@ -79,70 +92,109 @@ export function JanazaPostItem({ post, onDelete }: JanazaPostItemProps) {
     return `${Math.floor(diff / 3600)}${t('time.h')} ${t('time.ago')}`;
   };
 
-  /* Animation */
-  const [isLiked, setIsLiked] = React.useState(post.isLiked);
-  const [likesCount, setLikesCount] = React.useState(post.likes);
-  const scale = useSharedValue(1);
+  const formatJanazaDate = (isoString: string) => {
+    const date = new Date(isoString);
+    const locale = currentLanguage === 'ar' ? 'ar' : currentLanguage === 'fr' ? 'fr-FR' : 'en-US';
+    return date.toLocaleDateString(locale, { 
+      weekday: 'long', 
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric' 
+    });
+  };
 
-  const handleLike = () => {
-    const newState = !isLiked;
-    setIsLiked(newState);
-    setLikesCount(prev => newState ? prev + 1 : prev - 1);
-    
-    scale.value = withSequence(
-      withSpring(1.2),
-      withSpring(1)
-    );
+  const extractTime = (isoString: string) => {
+    const date = new Date(isoString);
+    return date.toLocaleTimeString(currentLanguage === 'ar' ? 'ar' : currentLanguage === 'fr' ? 'fr-FR' : 'en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: false 
+    });
+  };
 
-    socialService.likePost(post.id);
+  const addToAgenda = async () => {
+    const ok = await socialService.saveToAgenda(post.id, isPinned);
+    if (ok) {
+      setInAgendaState(true);
+      dispatch(setInAgenda({ postId: post.id, pinned: isPinned }));
+      toast.show({ type: 'success', message: t('feed.addedToAgenda') });
+    } else {
+      toast.show({ type: 'error', message: t('common.error') });
+    }
+  };
+
+  const togglePin = async () => {
+    const next = !isPinned;
+    const ok = await socialService.setPinned(post.id, next);
+    if (ok) {
+      setIsPinned(next);
+      setInAgendaState(true);
+      dispatch(setPinnedAction({ postId: post.id, pinned: next }));
+      toast.show({ type: 'success', message: next ? t('feed.pinned') : t('feed.unpinned') });
+    } else {
+      toast.show({ type: 'error', message: t('common.error') });
+    }
   };
 
   const handleComment = () => {
-      // Navigate to comments
       router.push({
         pathname: '/feed/comments/[id]',
         params: { id: post.id, type: post.type }
       });
   };
 
-  const heartStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }]
-  }));
-
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
       {/* Janaza Header Banner */}
       <LinearGradient
-        colors={['#1F2937', '#111827']}
+        colors={['#192236', '#0E1626']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={styles.banner}
       >
         <View style={styles.bannerContent}>
-            <View style={styles.bannerIconBg}>
-                <Ionicons name="moon" size={16} color="#FFF" />
-            </View>
-            <Text style={[styles.bannerText, { fontFamily: fontMedium }]}>{t('feed.janazaAlert')}</Text>
-        </View>
-        <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
-            <Text style={[styles.bannerTime, { fontFamily: fontRegular }]}>{formatTime(post.timestamp)}</Text>
-            {(currentUser?.id === post.user.id || currentUser?.isAdmin) && (
-                <Pressable onPress={handleMore}>
-                    <Ionicons name="ellipsis-horizontal" size={20} color="rgba(255,255,255,0.7)" />
+            <Image source={Images.death} style={styles.bannerIcon} contentFit="contain" />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.bannerText, { fontFamily: fontMedium }]}>ALERTE JANAZA</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                <Text style={[styles.bannerTime, { fontFamily: fontRegular }]}>{formatTime(post.timestamp)}</Text>
+                <Pressable style={styles.pinButton} onPress={togglePin}>
+                  <Ionicons name={isPinned ? 'pin' : 'pin-outline'} size={16} color="#FFF" />
                 </Pressable>
-            )}
+              </View>
+            </View>
         </View>
+        {(currentUser?.id === post.user.id || currentUser?.isAdmin) && (
+          <Pressable onPress={handleMore}>
+            <Ionicons name="ellipsis-horizontal" size={20} color="rgba(255,255,255,0.7)" />
+          </Pressable>
+        )}
       </LinearGradient>
 
       {/* Main Content */}
       <View style={styles.mainContent}>
         <View style={styles.userRow}>
-             <Image source={{ uri: post.user.avatar }} style={styles.avatar} />
-             <Text style={[styles.userName, { fontFamily: fontMedium, color: colors.text.secondary }]}>
-                 {t('feed.postedBy')} {post.user.name}
-             </Text>
+             <Image source={Images.death} style={styles.avatar} contentFit="contain" />
+             <View>
+               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[styles.userName, { fontFamily: fontBold, color: colors.text.primary }]}>
+                      Umar
+                  </Text>
+                  <Text style={[styles.tagNearName, { fontFamily: fontMedium, color: colors.primary }]}>
+                      {tags.length ? tags[0] : '#salatjanaza'}
+                  </Text>
+               </View>
+               <Text style={[styles.timeNearName, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+                 {formatTime(post.timestamp)}
+               </Text>
+             </View>
         </View>
+        {tags.length > 0 && (
+          <Text style={[styles.tags, { fontFamily: fontMedium, color: colors.primary }]}>
+            {tags.join(' ')}
+          </Text>
+        )}
 
         <Text style={[styles.introText, { fontFamily: fontRegular, color: colors.text.secondary }]}>
             Inna lillahi wa inna ilayhi raji'un
@@ -161,86 +213,119 @@ export function JanazaPostItem({ post, onDelete }: JanazaPostItemProps) {
 
         {/* Info Grid */}
         <View style={[styles.infoGrid, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F9FAFB' }]}>
-            <View style={styles.infoRow}>
-                <Ionicons name="time" size={20} color={colors.primary} />
-                <View style={styles.infoTextContainer}>
-                    <Text style={[styles.infoLabel, { fontFamily: fontRegular, color: colors.text.secondary }]}>{t('feed.prayerTime')}</Text>
-                    <Text style={[styles.infoValue, { fontFamily: fontMedium, color: colors.text.primary }]}>{prayerTime}</Text>
-                </View>
-            </View>
-            <View style={styles.divider} />
+            {/* Mosque Location */}
             <Pressable onPress={openDirections} style={({pressed}) => [styles.infoRow, { opacity: pressed ? 0.7 : 1 }]}>
-                <Ionicons name="location" size={20} color={colors.primary} />
+                <Ionicons name="location" size={20} color={colors.text.secondary} style={styles.infoIcon} />
                 <View style={styles.infoTextContainer}>
-                    <Text style={[styles.infoLabel, { fontFamily: fontRegular, color: colors.text.secondary }]}>{t('feed.location')}</Text>
                     <Text style={[styles.infoValue, { fontFamily: fontMedium, color: colors.text.primary }]}>{mosqueName}</Text>
+                    {mosqueAddress && (
+                        <Text style={[styles.infoAddress, { fontFamily: fontRegular, color: colors.text.secondary }]}>{mosqueAddress}</Text>
+                    )}
                 </View>
-                <Ionicons name="chevron-forward" size={16} color={colors.text.secondary} style={{opacity: 0.5}} />
             </Pressable>
-            {cemeteryName && (
+            
+            {/* Cemetery or Repatriation */}
+            {(cemeteryName || isRepatriation) && (
                 <>
                 <View style={styles.divider} />
                 <View style={styles.infoRow}>
-                    <Ionicons name="leaf" size={20} color={colors.primary} />
+                    <Ionicons name="construct-outline" size={20} color={colors.text.secondary} style={styles.infoIcon} />
                     <View style={styles.infoTextContainer}>
-                        <Text style={[styles.infoLabel, { fontFamily: fontRegular, color: colors.text.secondary }]}>{t('feed.burial')}</Text>
-                        <Text style={[styles.infoValue, { fontFamily: fontMedium, color: colors.text.primary }]}>{cemeteryName}</Text>
+                        <Text style={[styles.infoValue, { fontFamily: fontMedium, color: colors.text.primary }]}>
+                            {isRepatriation ? t('feed.repatriation') : `${cemeteryName}${cemeteryAddress ? ` ${cemeteryAddress}` : ''}`}
+                        </Text>
                     </View>
                 </View>
                 </>
             )}
 
+            {/* Date and Time */}
+            <View style={styles.divider} />
+            <View style={styles.infoRow}>
+                <Ionicons name="calendar" size={20} color={colors.text.secondary} style={styles.infoIcon} />
+                <View style={styles.infoTextContainer}>
+                    <Text style={[styles.infoValue, { fontFamily: fontBold, color: colors.text.primary }]}>
+                        {prayerDate ? formatJanazaDate(prayerDate) : formatJanazaDate(post.timestamp)}
+                    </Text>
+                </View>
+                <Ionicons name="time" size={20} color={colors.text.secondary} style={[styles.infoIcon, { marginLeft: 8 }]} />
+                <Text style={[styles.infoTime, { fontFamily: fontMedium, color: colors.text.primary }]}>
+                    {prayerTime || extractTime(post.timestamp)}
+                </Text>
+            </View>
         </View>
 
-        {/* Action Buttons (Utility) */}
-        <View style={styles.actionButtons}>
-            <Pressable 
-                onPress={() => Alert.alert(t('common.success'), t('feed.addedToAgenda'))}
-                style={[styles.secondaryButton, { borderColor: isDark ? 'rgba(255,255,255,0.2)' : '#E5E7EB', flex: 1 }]}
-            >
-                <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-                <Text style={[styles.secondaryButtonText, { fontFamily: fontMedium, color: colors.text.primary }]}>Agenda</Text>
-            </Pressable>
-
-            <Pressable 
-                onPress={openDirections}
-                style={[styles.primaryButton, { backgroundColor: colors.primary, flex: 2 }]}
-            >
-                <Ionicons name="navigate" size={18} color="#FFF" />
-                <Text style={[styles.buttonText, { fontFamily: fontMedium }]}>{t('mosques.directions')}</Text>
-            </Pressable>
+        {/* Action Buttons - icons only */}
+        <View style={styles.actionRowSingle}>
+          <Pressable onPress={handleComment} style={styles.iconButton}>
+            <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.primary} />
+          </Pressable>
+          <Pressable onPress={() => setMeritVisible(true)} style={styles.iconButton}>
+            <Ionicons name="flower-outline" size={18} color={colors.primary} />
+          </Pressable>
+          <Pressable 
+              onPress={addToAgenda}
+              style={styles.iconButton}
+          >
+              <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+          </Pressable>
+          <Pressable 
+              onPress={openDirections}
+              style={styles.iconButton}
+          >
+              <Ionicons name="navigate" size={18} color={colors.primary} />
+          </Pressable>
+          <Pressable onPress={handleShare} style={styles.iconButton}>
+            <Ionicons name="share-social-outline" size={18} color={colors.primary} />
+          </Pressable>
         </View>
       </View>
 
-      {/* Social Footer */}
-      <View style={[styles.footer, { borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
-          <Pressable onPress={handleLike} style={styles.footerButton}>
-            <Animated.View style={heartStyle}>
-                <Ionicons 
-                    name={isLiked ? "heart" : "heart-outline"} 
-                    size={22} 
-                    color={isLiked ? "#F87171" : colors.text.secondary} 
-                />
-            </Animated.View>
-            <Text style={[styles.footerButtonText, { fontFamily: fontMedium, color: colors.text.secondary }]}>
-                {likesCount > 0 ? likesCount : t('feed.like')}
+      {/* Merit Modal */}
+      <Modal
+        visible={meritVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMeritVisible(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setMeritVisible(false)}>
+          <Pressable style={[styles.modalCard, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
+            <Pressable style={styles.modalClose} onPress={() => setMeritVisible(false)}>
+              <Ionicons name="close" size={24} color={colors.text.primary} />
+            </Pressable>
+            
+            {/* Floral Icon */}
+            <View style={styles.modalIconContainer}>
+              <Ionicons name="flower" size={32} color={colors.primary} />
+            </View>
+            
+            {/* Title */}
+            <Text style={[styles.modalTitle, { fontFamily: fontBold, color: colors.primary }]}>
+              {t('feed.meritTitle')}
+            </Text>
+            
+            {/* Bismillah */}
+            <Text style={[styles.modalBismillah, { fontFamily: fontRegular, color: colors.text.primary }]}>
+              {t('feed.meritBismillah')}
+            </Text>
+            
+            {/* Hadith Text */}
+            <Text style={[styles.modalText, { fontFamily: fontRegular, color: colors.text.primary }]}>
+              {t('feed.meritContent')}
+            </Text>
+            
+            {/* Source */}
+            <Text style={[styles.modalSource, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+              {t('feed.meritSource')}
+            </Text>
+            
+            {/* Footnote */}
+            <Text style={[styles.modalFootnote, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+              {t('feed.meritFootnote')}
             </Text>
           </Pressable>
-
-          <Pressable onPress={handleComment} style={styles.footerButton}>
-            <Ionicons name="chatbubble-outline" size={20} color={colors.text.secondary} />
-            <Text style={[styles.footerButtonText, { fontFamily: fontMedium, color: colors.text.secondary }]}>
-                {post.comments > 0 ? post.comments : t('feed.comment')}
-            </Text>
-          </Pressable>
-
-          <Pressable onPress={handleShare} style={styles.footerButton}>
-            <Ionicons name="share-social-outline" size={20} color={colors.text.secondary} />
-            <Text style={[styles.footerButtonText, { fontFamily: fontMedium, color: colors.text.secondary }]}>
-                {t('feed.share')}
-            </Text>
-          </Pressable>
-      </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -255,6 +340,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
+  },
+  pinButton: {
+    backgroundColor: Colors.palette.purple.primary,
+    padding: 6,
+    borderRadius: 16,
+    minWidth: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   banner: {
     flexDirection: 'row',
@@ -313,6 +406,11 @@ const styles = StyleSheet.create({
       marginBottom: 12,
       lineHeight: 22,
   },
+  tags: {
+    marginTop: 4,
+    marginBottom: 8,
+    fontSize: 12,
+  },
   deceasedName: {
     fontSize: 20,
     marginBottom: 16,
@@ -325,65 +423,138 @@ const styles = StyleSheet.create({
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 12,
+  },
+  infoIcon: {
+    marginRight: 12,
   },
   infoTextContainer: {
-    marginLeft: 12,
     flex: 1,
   },
-  infoLabel: {
-    fontSize: 12,
-    marginBottom: 2,
-  },
   infoValue: {
-    fontSize: 14,
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  infoAddress: {
+    fontSize: 13,
+    marginTop: 2,
+    lineHeight: 18,
+  },
+  infoTime: {
+    fontSize: 15,
+    marginLeft: 4,
   },
   divider: {
     height: 1,
     backgroundColor: 'rgba(0,0,0,0.05)',
   },
-  actionButtons: {
+  actionRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
+    marginTop: 12,
     marginBottom: 4,
   },
-  primaryButton: {
-    height: 48,
-    borderRadius: 12,
+  actionRowSingle: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+    marginBottom: 4,
+    justifyContent: 'space-between',
+  },
+  actionPill: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-  },
-  secondaryButton: {
-    height: 48,
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
     borderRadius: 12,
     borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  actionPillText: {
+    fontSize: 13,
+  },
+  iconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footer: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    paddingVertical: 12,
+  },
+  footerButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-  },
-  buttonText: {
-    color: '#FFF',
-    fontSize: 14,
-  },
-  secondaryButtonText: {
-      fontSize: 14,
-  },
-  footer: {
-      flexDirection: 'row',
-      borderTopWidth: 1,
-      paddingVertical: 12,
-  },
-  footerButton: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
+    gap: 6,
   },
   footerButtonText: {
-      fontSize: 13,
-  }
+    fontSize: 13,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 20,
+    padding: 24,
+    paddingTop: 40,
+  },
+  modalClose: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    padding: 8,
+    zIndex: 10,
+  },
+  modalIconContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 24,
+  },
+  modalBismillah: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  modalText: {
+    fontSize: 14,
+    lineHeight: 22,
+    marginBottom: 16,
+    textAlign: 'left',
+  },
+  modalSource: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 12,
+    fontStyle: 'italic',
+  },
+  modalFootnote: {
+    fontSize: 12,
+    marginTop: 8,
+    textAlign: 'left',
+  },
 });
+
+

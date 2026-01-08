@@ -105,20 +105,11 @@ apiRouter.post('/register', async (req, res) => {
         email,
         password_hash: password, // Supabase handles hashing
         full_name: fullName,
+        age: age ?? null,
+        gender: gender ?? null,
+        phone_number: phone ?? null,
         otp_code: otpCode,
         expires_at: expiresAt,
-        // Store extra fields in pending too, to carry over to verification
-        // Note: You might need to add these columns to pending_registrations if not using JSONB or similar, 
-        // OR we can just pass them again during verify (client side state).
-        // For simplicity let's assume we pass them again in verify-otp OR we store them in a metadata column.
-        // Let's add a 'metadata' jsonb column to pending_registrations in a real app,
-        // but since I can't easily change pending_registrations schema right now without risking breaking flow if I missed it in migration script,
-        // I will MODIFY the client to pass these details in /verify-otp as well. 
-        // FOR NOW: I will rely on the client sending these details again in verify.
-        // WAIT: The client flow is: Register -> Email Sent -> Input OTP -> Verify.
-        // The verify screen needs to know these details. 
-        // Better implementation: Update pending_registrations schema or use a JSON column.
-        // Let's assume for this specific instruction I will update verify-otp to receive these params from the client (passed via navigation params).
       }, { onConflict: 'email' });
 
     if (dbError) {
@@ -227,22 +218,52 @@ apiRouter.post('/verify-otp', async (req, res) => {
       return res.status(400).json({ error: 'Invalid verification code' });
     }
 
+    const resolvedFullName = fullName || pending.full_name;
+    const resolvedAge = (age ?? pending.age) ?? null;
+    const resolvedGender = gender || pending.gender || null;
+    const resolvedPhone = phone || pending.phone_number || null;
+
+    if (!resolvedGender) {
+      return res.status(400).json({ error: 'Gender is required' });
+    }
+
     // Create the actual Supabase auth user
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: pending.email,
       password: pending.password_hash,
       email_confirm: true,
       user_metadata: {
-        full_name: fullName || pending.full_name, // Fallback to pending if not passed
-        age: age,
-        gender: gender,
-        phone_number: phone
+        full_name: resolvedFullName,
+        age: resolvedAge,
+        gender: resolvedGender,
+        phone_number: resolvedPhone
       },
     });
 
     if (authError) {
       console.error('Auth Error:', authError);
       return res.status(500).json({ error: 'Failed to create account' });
+    }
+
+    // Ensure profile is created/updated with extra fields
+    const { error: profileUpsertError } = await supabase
+      .from('profiles')
+      .upsert(
+        {
+          id: authData.user.id,
+          email: pending.email,
+          full_name: resolvedFullName,
+          age: resolvedAge,
+          gender: resolvedGender,
+          phone_number: resolvedPhone,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' }
+      );
+
+    if (profileUpsertError) {
+      console.error('Profile upsert error:', profileUpsertError);
+      // Non-fatal: user is created; app can still work
     }
 
     // Clean up pending registration

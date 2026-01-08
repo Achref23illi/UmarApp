@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     ActivityIndicator,
     Alert,
-    Dimensions,
     KeyboardAvoidingView,
     Platform,
     Pressable,
@@ -16,15 +17,24 @@ import {
     TextInput,
     View
 } from 'react-native';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AuthTabs } from '@/components/auth/AuthTabs';
+import { BirthdayPicker } from '@/components/auth/BirthdayPicker';
+import { Country, CountryPickerModal, DEFAULT_COUNTRY } from '@/components/auth/CountryPickerModal';
+import { GenderSelectModal, GenderValue } from '@/components/auth/GenderSelectModal';
+import { Images } from '@/config/assets';
+import { Colors } from '@/config/colors';
 import { Fonts } from '@/hooks/use-fonts';
 import { useGoogleAuth } from '@/hooks/use-google-auth';
-import { useTheme } from '@/hooks/use-theme';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const PURPLE = Colors.palette.purple.primary;
+const PURPLE_DARK = Colors.palette.purple.dark;
+const PURPLE_LIGHT = Colors.palette.purple.light;
+const GOLD = Colors.palette.gold.primary;
+const WHITE = Colors.palette.neutral.white;
 
 export default function RegisterScreen() {
   const { t } = useTranslation();
@@ -34,14 +44,11 @@ export default function RegisterScreen() {
   const { isLoading, error } = useAppSelector((state) => state.user);
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
   const { handleGoogleLogin } = useGoogleAuth();
-  const { colors, isDark } = useTheme();
-
-  // Show error effect
-  if (error) {
-     Alert.alert(t('common.error'), error, [
-         { text: 'OK', onPress: () => { /* dispatch clearError */ } }
-     ]);
-  }
+  
+  useEffect(() => {
+    if (!error) return;
+    Alert.alert(t('common.error'), error, [{ text: 'OK' }]);
+  }, [error, t]);
 
   const isRTL = currentLanguage === 'ar';
 
@@ -53,8 +60,13 @@ export default function RegisterScreen() {
 
   // Step 2 State
   const [step, setStep] = useState(1);
-  const [age, setAge] = useState('');
+  const [birthday, setBirthday] = useState<Date | null>(null);
+  const [birthdayPickerVisible, setBirthdayPickerVisible] = useState(false);
   const [gender, setGender] = useState<'male' | 'female' | null>(null);
+  const [genderModalVisible, setGenderModalVisible] = useState(false);
+  const [genderDraft, setGenderDraft] = useState<GenderValue | null>(null);
+  const [selectedCountry, setSelectedCountry] = useState<Country | null>(DEFAULT_COUNTRY);
+  const [countryPickerVisible, setCountryPickerVisible] = useState(false);
   const [phone, setPhone] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   
@@ -67,6 +79,19 @@ export default function RegisterScreen() {
   const fontSemiBold = isRTL ? Fonts.arabicSemiBold : Fonts.semiBold;
   const fontBold = isRTL ? Fonts.arabicBold : Fonts.bold;
 
+  const tabLabels = useMemo(
+    () => ({
+      register: t('auth.tabs.register'),
+      login: t('auth.tabs.login'),
+    }),
+    [t]
+  );
+
+  const openGenderModal = () => {
+    setGenderDraft(gender);
+    setGenderModalVisible(true);
+  };
+
   const handleNextStep = () => {
     if (!name || !email || !password) {
       Alert.alert(t('common.error'), t('auth.register.fillAllFields') || 'Please fill in all fields');
@@ -77,18 +102,47 @@ export default function RegisterScreen() {
       Alert.alert(t('common.error'), 'Password must be at least 6 characters');
       return;
     }
-    setStep(2);
+    openGenderModal();
+  };
+
+  const calculateAge = (birthDate: Date): number => {
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
   };
 
   const handleRegister = async () => {
-    if (!gender || !agreedToTerms) {
-       Alert.alert(t('common.error'), 'Please select gender and agree to terms');
-       return;
+    if (!gender) {
+      openGenderModal();
+      return;
+    }
+    if (!birthday) {
+      Alert.alert(t('common.error'), t('auth.register.birthday') + ' is required');
+      setBirthdayPickerVisible(true);
+      return;
+    }
+    if (!selectedCountry || !phone) {
+      Alert.alert(t('common.error'), t('auth.register.phone') + ' is required');
+      if (!selectedCountry) {
+        setCountryPickerVisible(true);
+      }
+      return;
+    }
+    if (!agreedToTerms) {
+      Alert.alert(t('common.error'), 'Please agree to terms');
+      return;
     }
 
     setIsSubmitting(true);
 
     try {
+      const age = calculateAge(birthday);
+      const fullPhone = selectedCountry.dialCode + phone.replace(/\D/g, '');
+
       const apiUrl = process.env.EXPO_PUBLIC_API_URL;
       const response = await fetch(`${apiUrl}/register`, {
         method: 'POST',
@@ -97,9 +151,9 @@ export default function RegisterScreen() {
           email, 
           password, 
           fullName: name,
-          age: age ? parseInt(age) : null,
+          age,
           gender,
-          phone 
+          phone: fullPhone 
         }),
       });
 
@@ -110,10 +164,10 @@ export default function RegisterScreen() {
         return;
       }
 
-      // Success - redirect to OTP verification, passing extra user details if backend sends email only
+      // Success - redirect to OTP verification
       router.push({ 
         pathname: '/auth/verify-email', 
-        params: { email, fullName: name, age: age || undefined, gender, phone } 
+        params: { email, fullName: name, age: age.toString(), gender, phone: fullPhone } 
       });
 
     } catch (e) {
@@ -124,16 +178,25 @@ export default function RegisterScreen() {
     }
   };
 
-  const isSmallScreen = SCREEN_HEIGHT < 700;
-  
-  // Dynamic Background Gradient
-  const gradientColors = (isDark 
-    ? [colors.background, '#1A1A2E', colors.background]
-    : [colors.background, colors.surface, colors.background]) as [string, string, string];
-
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <LinearGradient colors={gradientColors} style={styles.gradient} />
+    <View style={styles.container}>
+      <LinearGradient colors={[PURPLE_LIGHT, PURPLE, PURPLE_DARK]} style={styles.gradient} />
+      <StatusBar style="light" />
+
+      <GenderSelectModal
+        visible={genderModalVisible}
+        value={genderDraft}
+        title={t('auth.register.genderModal.title')}
+        confirmLabel={t('auth.register.genderModal.confirm')}
+        onChange={setGenderDraft}
+        onClose={() => setGenderModalVisible(false)}
+        onConfirm={() => {
+          if (!genderDraft) return;
+          setGender(genderDraft);
+          setGenderModalVisible(false);
+          setStep(2);
+        }}
+      />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -141,235 +204,229 @@ export default function RegisterScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-          <View style={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}>
-            
-            {/* Back Button */}
-            <Animated.View entering={FadeInUp.delay(100)}>
-              <Pressable 
-                onPress={() => step === 2 ? setStep(1) : router.back()} 
-                style={[styles.backButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
-              >
-                <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={colors.text.primary} />
-              </Pressable>
+          <View style={[styles.content, { paddingTop: insets.top + 18, paddingBottom: insets.bottom + 18 }]}>
+            {/* Brand */}
+            <Animated.View entering={FadeInDown.duration(450)} style={styles.header}>
+              <Image source={Images.logoWhite} style={styles.logo} contentFit="contain" />
             </Animated.View>
 
-            {/* Header */}
-            <Animated.View entering={FadeInDown.delay(200)} style={styles.header}>
-              <Text style={[styles.title, { fontFamily: fontBold, color: colors.text.primary }, isSmallScreen && styles.titleSmall]}>
-                {step === 1 ? t('auth.register.title') : 'About You'}
-              </Text>
-              <Text style={[styles.subtitle, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-                {step === 1 ? t('auth.register.subtitle') : 'Help us personalize your experience'}
-              </Text>
+            {/* Tabs */}
+            <Animated.View entering={FadeInDown.delay(80).duration(450)} style={styles.tabs}>
+              <AuthTabs
+                active="register"
+                labels={tabLabels}
+                onChange={(tab) => {
+                  if (tab === 'login') router.replace('/auth/login');
+                }}
+              />
             </Animated.View>
 
-            {/* Form */}
-            <Animated.View entering={FadeInDown.delay(300)} style={styles.form}>
-              
+            {/* Card */}
+            <Animated.View entering={FadeInDown.delay(160).duration(450)} style={styles.card}>
+              <Text style={[styles.cardTitle, { fontFamily: fontBold }]}>
+                {t('auth.register.title')}
+              </Text>
+              <Text style={[styles.cardSubtitle, { fontFamily: fontRegular }]}>
+                {step === 1 ? t('auth.register.subtitle') : t('auth.register.subtitle')}
+              </Text>
+
               {step === 1 ? (
-                // STEP 1 FIELDS
                 <>
-                  <View style={styles.inputWrapper}>
-                    <Text style={[styles.inputLabel, { fontFamily: fontMedium, color: colors.text.secondary }]}>{t('auth.register.name')}</Text>
-                    <View style={[styles.inputContainer, { backgroundColor: colors.input.background, borderColor: focusedInput === 'name' ? colors.secondary : colors.input.border }]}> 
-                      <Ionicons name="person-outline" size={20} color={colors.input.placeholder} style={styles.inputIcon} />
-                      <TextInput
-                        style={[styles.input, { fontFamily: fontRegular, color: colors.text.primary }]}
-                        value={name}
-                        onChangeText={setName}
-                        placeholder={t('auth.register.namePlaceholder')}
-                        placeholderTextColor={colors.input.placeholder}
-                        onFocus={() => setFocusedInput('name')}
-                        onBlur={() => setFocusedInput(null)}
-                      />
-                    </View>
+                  <View style={[styles.field, focusedInput === 'name' && styles.fieldFocused]}>
+                    <Ionicons name="person-outline" size={20} color="rgba(255,255,255,0.9)" />
+                    <TextInput
+                      style={[styles.input, { fontFamily: fontRegular }]}
+                      value={name}
+                      onChangeText={setName}
+                      placeholder={t('auth.register.namePlaceholder')}
+                      placeholderTextColor="rgba(255,255,255,0.65)"
+                      onFocus={() => setFocusedInput('name')}
+                      onBlur={() => setFocusedInput(null)}
+                      textAlign={isRTL ? 'right' : 'left'}
+                    />
                   </View>
 
-                  <View style={styles.inputWrapper}>
-                    <Text style={[styles.inputLabel, { fontFamily: fontMedium, color: colors.text.secondary }]}>{t('auth.register.email')}</Text>
-                    <View style={[styles.inputContainer, { backgroundColor: colors.input.background, borderColor: focusedInput === 'email' ? colors.secondary : colors.input.border }]}> 
-                      <Ionicons name="mail-outline" size={20} color={colors.input.placeholder} style={styles.inputIcon} />
-                      <TextInput
-                        style={[styles.input, { fontFamily: fontRegular, color: colors.text.primary }]}
-                        value={email}
-                        onChangeText={setEmail}
-                        placeholder={t('auth.register.emailPlaceholder')}
-                        placeholderTextColor={colors.input.placeholder}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        onFocus={() => setFocusedInput('email')}
-                        onBlur={() => setFocusedInput(null)}
-                      />
-                    </View>
+                  <View style={[styles.field, focusedInput === 'email' && styles.fieldFocused]}>
+                    <Ionicons name="mail-outline" size={20} color="rgba(255,255,255,0.9)" />
+                    <TextInput
+                      style={[styles.input, { fontFamily: fontRegular }]}
+                      value={email}
+                      onChangeText={setEmail}
+                      placeholder={t('auth.register.emailPlaceholder')}
+                      placeholderTextColor="rgba(255,255,255,0.65)"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      onFocus={() => setFocusedInput('email')}
+                      onBlur={() => setFocusedInput(null)}
+                      textAlign={isRTL ? 'right' : 'left'}
+                    />
                   </View>
 
-                  <View style={styles.inputWrapper}>
-                    <Text style={[styles.inputLabel, { fontFamily: fontMedium, color: colors.text.secondary }]}>{t('auth.register.password')}</Text>
-                    <View style={[styles.inputContainer, { backgroundColor: colors.input.background, borderColor: focusedInput === 'password' ? colors.secondary : colors.input.border }]}> 
-                      <Ionicons name="lock-closed-outline" size={20} color={colors.input.placeholder} style={styles.inputIcon} />
-                      <TextInput
-                        style={[styles.input, { fontFamily: fontRegular, color: colors.text.primary }]}
-                        value={password}
-                        onChangeText={setPassword}
-                        placeholder={t('auth.register.passwordPlaceholder')}
-                        placeholderTextColor={colors.input.placeholder}
-                        secureTextEntry={!showPassword}
-                        onFocus={() => setFocusedInput('password')}
-                        onBlur={() => setFocusedInput(null)}
+                  <View style={[styles.field, focusedInput === 'password' && styles.fieldFocused]}>
+                    <Ionicons name="lock-closed-outline" size={20} color="rgba(255,255,255,0.9)" />
+                    <TextInput
+                      style={[styles.input, { fontFamily: fontRegular }]}
+                      value={password}
+                      onChangeText={setPassword}
+                      placeholder={t('auth.register.passwordPlaceholder')}
+                      placeholderTextColor="rgba(255,255,255,0.65)"
+                      secureTextEntry={!showPassword}
+                      onFocus={() => setFocusedInput('password')}
+                      onBlur={() => setFocusedInput(null)}
+                      textAlign={isRTL ? 'right' : 'left'}
+                    />
+                    <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton} hitSlop={10}>
+                      <Ionicons
+                        name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                        size={20}
+                        color="rgba(255,255,255,0.75)"
                       />
-                      <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
-                        <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.input.placeholder} />
-                      </Pressable>
-                    </View>
+                    </Pressable>
                   </View>
 
-                   <Pressable 
-                    onPress={handleNextStep} 
-                    style={({ pressed }) => [styles.registerButton, { backgroundColor: colors.secondary, opacity: pressed ? 0.7 : 1 }]}
-                  >
-                    <Text style={[styles.registerButtonText, { fontFamily: fontSemiBold, color: '#000' }]}>Next</Text>
-                    <Ionicons name="arrow-forward" size={20} color="#000" />
+                  <Pressable onPress={handleNextStep} style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}>
+                    <Text style={[styles.ctaText, { fontFamily: fontSemiBold }]}>{t('common.next')}</Text>
+                    <Ionicons name={isRTL ? 'arrow-back' : 'arrow-forward'} size={20} color="#000" />
                   </Pressable>
+
+                  <View style={styles.divider}>
+                    <View style={styles.dividerLine} />
+                    <Text style={[styles.dividerText, { fontFamily: fontRegular }]}>{t('common.or')}</Text>
+                    <View style={styles.dividerLine} />
+                  </View>
+
+                  <View style={styles.socialRow}>
+                    <Pressable onPress={handleGoogleLogin} style={({ pressed }) => [styles.socialButton, pressed && styles.socialPressed]}>
+                      <Ionicons name="logo-google" size={20} color={WHITE} />
+                      <Text style={[styles.socialText, { fontFamily: fontMedium }]}>{t('auth.social.google')}</Text>
+                    </Pressable>
+                  </View>
                 </>
               ) : (
-                // STEP 2 FIELDS
                 <>
-                  <View style={styles.inputWrapper}>
-                    <Text style={[styles.inputLabel, { fontFamily: fontMedium, color: colors.text.secondary }]}>I am a...</Text>
-                    <View style={{ flexDirection: 'row', gap: 12 }}>
-                      <Pressable 
-                        onPress={() => setGender('male')}
-                        style={[
-                            styles.genderButton, 
-                            { borderColor: gender === 'male' ? colors.secondary : colors.border, backgroundColor: gender === 'male' ? 'rgba(245,198,97,0.1)' : 'transparent' }
-                        ]}
-                      >
-                         <Text style={{ fontSize: 24 }}>🧔‍♂️</Text>
-                         <Text style={[styles.genderText, { fontFamily: fontMedium, color: colors.text.primary }]}>Akhi (Brother)</Text>
-                      </Pressable>
-                      <Pressable 
-                        onPress={() => setGender('female')}
-                         style={[
-                            styles.genderButton, 
-                            { borderColor: gender === 'female' ? colors.secondary : colors.border, backgroundColor: gender === 'female' ? 'rgba(245,198,97,0.1)' : 'transparent' }
-                        ]}
-                      >
-                         <Text style={{ fontSize: 24 }}>🧕</Text>
-                         <Text style={[styles.genderText, { fontFamily: fontMedium, color: colors.text.primary }]}>Okht (Sister)</Text>
-                      </Pressable>
-                    </View>
-                  </View>
+                  <Pressable
+                    onPress={() => setBirthdayPickerVisible(true)}
+                    style={[styles.field, !birthday && styles.fieldError]}
+                  >
+                    <Ionicons name="calendar-outline" size={20} color="rgba(255,255,255,0.9)" />
+                    <Text
+                      style={[
+                        styles.input,
+                        { fontFamily: fontRegular },
+                        !birthday && { color: 'rgba(255,255,255,0.65)' },
+                      ]}
+                    >
+                      {birthday
+                        ? birthday.toLocaleDateString(isRTL ? 'ar' : 'en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })
+                        : t('auth.register.birthdayPlaceholder')}
+                    </Text>
+                  </Pressable>
 
-                  <View style={styles.inputWrapper}>
-                    <Text style={[styles.inputLabel, { fontFamily: fontMedium, color: colors.text.secondary }]}>Age</Text>
-                    <View style={[styles.inputContainer, { backgroundColor: colors.input.background, borderColor: focusedInput === 'age' ? colors.secondary : colors.input.border }]}> 
-                      <Ionicons name="calendar-outline" size={20} color={colors.input.placeholder} style={styles.inputIcon} />
+                  <View style={styles.phoneContainer}>
+                    <Pressable
+                      onPress={() => {
+                        // Close other modals first
+                        setGenderModalVisible(false);
+                        setBirthdayPickerVisible(false);
+                        setCountryPickerVisible(true);
+                      }}
+                      style={[styles.countryButton, !selectedCountry && styles.fieldError]}
+                    >
+                      <Text style={[styles.countryCode, { fontFamily: fontMedium }]}>
+                        {selectedCountry ? `${selectedCountry.flag} ${selectedCountry.dialCode}` : t('auth.register.selectCountry')}
+                      </Text>
+                      <Ionicons name="chevron-down" size={18} color="rgba(255,255,255,0.9)" />
+                    </Pressable>
+                    <View style={[styles.phoneInput, !phone && styles.fieldError]}>
+                      <Ionicons name="call-outline" size={20} color="rgba(255,255,255,0.9)" />
                       <TextInput
-                        style={[styles.input, { fontFamily: fontRegular, color: colors.text.primary }]}
-                        value={age}
-                        onChangeText={setAge}
-                        placeholder="Your Age (Optional)"
-                        placeholderTextColor={colors.input.placeholder}
-                        keyboardType="numeric"
-                        onFocus={() => setFocusedInput('age')}
-                        onBlur={() => setFocusedInput(null)}
-                      />
-                    </View>
-                  </View>
-
-                  <View style={styles.inputWrapper}>
-                    <Text style={[styles.inputLabel, { fontFamily: fontMedium, color: colors.text.secondary }]}>Phone Number</Text>
-                     <View style={[styles.inputContainer, { backgroundColor: colors.input.background, borderColor: focusedInput === 'phone' ? colors.secondary : colors.input.border }]}> 
-                      <Ionicons name="call-outline" size={20} color={colors.input.placeholder} style={styles.inputIcon} />
-                      <TextInput
-                        style={[styles.input, { fontFamily: fontRegular, color: colors.text.primary }]}
+                        style={[styles.input, { fontFamily: fontRegular, flex: 1 }]}
                         value={phone}
                         onChangeText={setPhone}
-                        placeholder="Phone Number (Optional)"
-                         placeholderTextColor={colors.input.placeholder}
+                        placeholder={t('auth.register.phonePlaceholder')}
+                        placeholderTextColor="rgba(255,255,255,0.65)"
                         keyboardType="phone-pad"
                         onFocus={() => setFocusedInput('phone')}
                         onBlur={() => setFocusedInput(null)}
+                        textAlign={isRTL ? 'right' : 'left'}
                       />
                     </View>
                   </View>
 
-                  <Pressable onPress={() => setAgreedToTerms(!agreedToTerms)} style={styles.termsContainer}>
-                     <View style={[styles.checkbox, { borderColor: agreedToTerms ? colors.secondary : colors.text.disabled, backgroundColor: agreedToTerms ? colors.secondary : 'transparent' }]}>
-                        {agreedToTerms && <Ionicons name="checkmark" size={14} color="#000" />}
-                     </View>
-                     <Text style={[styles.termsText, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-                        I agree to the <Text style={{ color: colors.secondary }}>Terms of Service</Text> and <Text style={{ color: colors.secondary }}>Privacy Policy</Text>
-                     </Text>
+                  <Pressable onPress={() => setAgreedToTerms(!agreedToTerms)} style={styles.termsRow}>
+                    <View style={[styles.checkbox, agreedToTerms && styles.checkboxChecked]}>
+                      {agreedToTerms && <Ionicons name="checkmark" size={14} color="#000" />}
+                    </View>
+                    <Text style={[styles.termsText, { fontFamily: fontRegular }]}>
+                      I agree to the <Text style={styles.termsLink}>Terms</Text> and{' '}
+                      <Text style={styles.termsLink}>Privacy Policy</Text>
+                    </Text>
                   </Pressable>
 
-                  <Pressable 
-                    onPress={handleRegister} 
+                  <Pressable
+                    onPress={handleRegister}
                     disabled={isSubmitting}
-                    style={({ pressed }) => [
-                      styles.registerButton, 
-                      { 
-                        backgroundColor: colors.secondary,
-                        opacity: pressed ? 0.7 : (isSubmitting ? 0.6 : 1),
-                        transform: [{ scale: pressed ? 0.98 : 1 }]
-                      }
-                    ]}
+                    style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed, isSubmitting && styles.ctaDisabled]}
                   >
                     {isSubmitting ? (
                       <ActivityIndicator size="small" color="#000" />
                     ) : (
                       <>
-                        <Text style={[styles.registerButtonText, { fontFamily: fontSemiBold, color: '#000' }]}>
-                          {t('auth.register.signUp')}
-                        </Text>
+                        <Text style={[styles.ctaText, { fontFamily: fontSemiBold }]}>{t('auth.register.signUp')}</Text>
                         <Ionicons name="checkmark-done" size={20} color="#000" />
                       </>
                     )}
                   </Pressable>
                 </>
               )}
-            </Animated.View>
 
-            {/* Divider */}
-            {step === 1 && (
-            <Animated.View entering={FadeInDown.delay(400)} style={styles.divider}>
-              <View style={[styles.dividerLine, { backgroundColor: colors.divider }]} />
-              <Text style={[styles.dividerText, { fontFamily: fontRegular, color: colors.text.disabled }]}>
-                {t('common.or')}
-              </Text>
-              <View style={[styles.dividerLine, { backgroundColor: colors.divider }]} />
-            </Animated.View>
-            )}
-
-            {/* Social Buttons */}
-             {step === 1 && (
-            <Animated.View entering={FadeInDown.delay(500)} style={styles.socialContainer}>
-               <Pressable 
-                style={[styles.socialButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : colors.surface, borderColor: colors.border }]} 
-                onPress={handleGoogleLogin}
-              >
-                <Ionicons name="logo-google" size={22} color={colors.text.primary} />
-                <Text style={[styles.socialText, { fontFamily: fontMedium, color: colors.text.primary }]}>
-                  {t('auth.social.google')}
-                </Text>
-              </Pressable>
-            </Animated.View>
-             )}
-
-            {/* Login Link */}
-            <Animated.View entering={FadeInDown.delay(600)} style={styles.loginContainer}>
-              <Text style={[styles.loginText, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-                {t('auth.register.haveAccount')}{' '}
-              </Text>
-              <Pressable onPress={() => router.push('/auth/login')}>
-                <Text style={[styles.loginLink, { fontFamily: fontSemiBold, color: colors.secondary }]}>
-                  {t('auth.register.signIn')}
-                </Text>
-              </Pressable>
+              <View style={styles.bottomRow}>
+                <Text style={[styles.bottomText, { fontFamily: fontRegular }]}>{t('auth.register.haveAccount')}</Text>
+                <Pressable onPress={() => router.replace('/auth/login')} hitSlop={10}>
+                  <Text style={[styles.bottomLink, { fontFamily: fontSemiBold }]}>{t('auth.register.signIn')}</Text>
+                </Pressable>
+              </View>
             </Animated.View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Gender Modal */}
+      <GenderSelectModal
+        visible={genderModalVisible}
+        value={genderDraft}
+        title={t('auth.register.genderModal.title')}
+        confirmLabel={t('auth.register.genderModal.confirm')}
+        onChange={setGenderDraft}
+        onClose={() => setGenderModalVisible(false)}
+        onConfirm={() => {
+          if (genderDraft) {
+            setGender(genderDraft);
+            setGenderModalVisible(false);
+            setStep(2);
+          }
+        }}
+      />
+
+      {/* Birthday Picker Modal */}
+      <BirthdayPicker
+        visible={birthdayPickerVisible}
+        value={birthday}
+        onSelect={setBirthday}
+        onClose={() => setBirthdayPickerVisible(false)}
+      />
+
+      {/* Country Picker Modal */}
+      <CountryPickerModal
+        visible={countryPickerVisible}
+        selectedCountry={selectedCountry}
+        onSelect={setSelectedCountry}
+        onClose={() => setCountryPickerVisible(false)}
+      />
     </View>
   );
 }
@@ -388,143 +445,201 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
   },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
   header: {
-    marginBottom: 24,
+    alignItems: 'center',
+    marginBottom: 18,
   },
-  title: {
-    fontSize: 26,
+  logo: {
+    width: 56,
+    height: 56,
+  },
+  tabs: {
+    width: '100%',
+    marginBottom: 18,
+  },
+  card: {
+    width: '100%',
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 16,
+  },
+  cardTitle: {
+    color: WHITE,
+    fontSize: 20,
+    textAlign: 'center',
     marginBottom: 6,
   },
-  titleSmall: {
-    fontSize: 22,
+  cardSubtitle: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 18,
   },
-  subtitle: {
-    fontSize: 15,
-  },
-  form: {
-    marginBottom: 16,
-  },
-  inputWrapper: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 14,
-    marginBottom: 8,
-  },
-  inputContainer: {
+  field: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    height: 52,
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.25)',
+    paddingVertical: 12,
+    marginBottom: 14,
   },
-  inputIcon: {
-    marginRight: 10,
+  fieldFocused: {
+    borderBottomColor: GOLD,
+  },
+  fieldError: {
+    borderBottomColor: '#FF6B6B',
   },
   input: {
     flex: 1,
     fontSize: 15,
+    color: WHITE,
+    paddingVertical: 4,
+  },
+  phoneContainer: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
+  },
+  countryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.25)',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    minWidth: 120,
+  },
+  countryCode: {
+    fontSize: 15,
+    color: WHITE,
+  },
+  phoneInput: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.25)',
+    paddingVertical: 12,
   },
   eyeButton: {
     padding: 4,
   },
-  termsContainer: {
+  cta: {
+    height: 54,
+    borderRadius: 16,
+    backgroundColor: GOLD,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 10,
+  },
+  ctaPressed: {
+    transform: [{ scale: 0.99 }],
+    opacity: 0.92,
+  },
+  ctaDisabled: {
+    opacity: 0.75,
+  },
+  ctaText: {
+    color: '#000',
+    fontSize: 16,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  dividerText: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 12,
+    marginHorizontal: 12,
+  },
+  socialRow: {
+    gap: 10,
+    marginBottom: 16,
+  },
+  socialButton: {
+    height: 52,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  socialPressed: {
+    opacity: 0.92,
+  },
+  socialText: {
+    color: WHITE,
+    fontSize: 14,
+  },
+  termsRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 24,
+    gap: 10,
+    marginBottom: 14,
   },
   checkbox: {
     width: 20,
     height: 20,
     borderRadius: 6,
     borderWidth: 2,
-    marginRight: 10,
+    borderColor: 'rgba(255,255,255,0.45)',
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
   },
+  checkboxChecked: {
+    borderColor: GOLD,
+    backgroundColor: GOLD,
+  },
   termsText: {
     flex: 1,
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  termsLink: {
+    color: WHITE,
+    textDecorationLine: 'underline',
+  },
+  bottomRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  bottomText: {
+    color: 'rgba(255,255,255,0.8)',
     fontSize: 13,
-    lineHeight: 20,
   },
-  registerButton: {
-    height: 52,
-    borderRadius: 26,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  registerButtonText: {
-    fontSize: 17,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 16,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-  },
-  dividerText: {
+  bottomLink: {
+    color: WHITE,
     fontSize: 13,
-    marginHorizontal: 14,
-  },
-  socialContainer: {
-    gap: 12,
-  },
-  socialButton: {
-    height: 52,
-    borderRadius: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    gap: 10,
-  },
-  socialText: {
-    fontSize: 15,
-  },
-  loginContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 24,
-    paddingBottom: 24,
-  },
-  loginText: {
-    fontSize: 15,
-  },
-  loginLink: {
-    fontSize: 15,
-  },
-  genderButton: {
-    flex: 1,
-    height: 100,
-    borderRadius: 16,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  genderText: {
-    fontSize: 15,
+    textDecorationLine: 'underline',
   },
 });

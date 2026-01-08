@@ -7,13 +7,25 @@
 // Image assets
 export const Images = {
   // Logo
-  logo: require('@/assets/images/logo.png'),
+  logo: require('@/assets/logo/logo.png'),
   logoWhite: require('@/assets/images/logo_white.png'),
   icon: require('@/assets/images/icon.png'),
   // Welcome screen
-  welcomeBackground: require('@/assets/images/mosque.jpg'),
+  welcomeBackground: require('@/assets/images/bg-wa.jpg'),
+  // Onboarding Illustrations (placeholders until generated)
+  illustration1: require('@/assets/images/i1.png'),
+  illustration2: require('@/assets/images/i2.png'),
+  illustration3: require('@/assets/images/i3.png'),
+  // Auth / Signup
+  man: require('@/assets/images/man.png'),
+  woman: require('@/assets/images/woman.png'),
+  // Janaza
+  death: require('@/assets/images/death.png'),
+  // Sick visit
+  sick: require('@/assets/images/sick.png'),
   // Splash
   splashIcon: require('@/assets/images/splash-icon.png'),
+  splashBackground: require('@/assets/images/background.png'),
   // Home screen
   athanBackground: require('@/assets/images/athan_bg.png'),
 } as const;

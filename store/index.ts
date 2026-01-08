@@ -3,6 +3,7 @@ import appReducer from './slices/appSlice';
 import counterReducer from './slices/counterSlice';
 import languageReducer from './slices/languageSlice';
 import userReducer from './slices/userSlice';
+import agendaReducer from './slices/agendaSlice';
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
     user: userReducer,
     app: appReducer,
     language: languageReducer,
+    agenda: agendaReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

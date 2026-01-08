@@ -1,16 +1,15 @@
 import { Image } from 'expo-image';
 import React, { useEffect } from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
-  ZoomIn
+  ZoomIn,
 } from 'react-native-reanimated';
 
-import { Images, Svgs } from '@/config/assets';
-
-const { width, height } = Dimensions.get('window');
+import { Images } from '@/config/assets';
+import { Fonts } from '@/hooks/use-fonts';
 
 interface SplashScreenProps {
   onFinish?: () => void;
@@ -44,22 +43,12 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
 
   return (
     <Animated.View style={[styles.container, containerStyle]}>
-      {/* Background Color */}
-      <View style={styles.background} />
+      <Image source={Images.splashBackground} style={StyleSheet.absoluteFillObject} contentFit="cover" />
 
-      {/* Mosque Silhouette - Bottom Left, Low Opacity */}
-      <View style={styles.mosqueContainer}>
-        <Svgs.mosque width={width * 0.8} height={width * 0.8} style={styles.mosque} />
-      </View>
-
-      {/* Geometric Pattern - Overlay */}
-      <View style={styles.geometricContainer}>
-        <Svgs.geometric width={width} height={height} style={styles.geometric} />
-      </View>
-
-      {/* Logo - Center */}
-      <Animated.View entering={ZoomIn.duration(800)} style={styles.logoContainer}>
+      {/* Logo + Slogan */}
+      <Animated.View entering={ZoomIn.duration(800)} style={styles.centerContent}>
         <Image source={Images.logo} style={styles.logo} contentFit="contain" />
+        <Text style={styles.slogan}>Les portes du bien</Text>
       </Animated.View>
     </Animated.View>
   );
@@ -72,40 +61,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  background: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#F5F5F5',
-  },
-  mosqueContainer: {
-    position: 'absolute',
-    bottom: -50,
-    left: -50,
-    opacity: 0.15, // Low opacity as requested
-    zIndex: 1,
-  },
-  mosque: {
-    color: '#000', // Or a darker shade of the background
-  },
-  geometricContainer: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.1, // Subtle pattern
-    zIndex: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  geometric: {
-    color: '#000',
-  },
-  logoContainer: {
+  centerContent: {
     zIndex: 10,
-    width: 250,
-    height: 250,
-    justifyContent: 'center',
+    width: 260,
     alignItems: 'center',
-    // Removed white background and shadows
+    justifyContent: 'center',
+    paddingHorizontal: 24,
   },
   logo: {
-    width: 200,
-    height: 200,
+    width: 180,
+    height: 180,
+  },
+  slogan: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#000',
+    textAlign: 'center',
+    fontFamily: Fonts.medium,
   },
 });

@@ -35,10 +35,25 @@ export function InfiniteFeed({ ListHeaderComponent, userId, userLocation }: Infi
       
       const newPosts = await socialService.getPosts(pageNum, userId, userLocation);
       
+      // Sort posts: pinned first, then by timestamp
+      const sortedPosts = [...newPosts].sort((a, b) => {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+      });
+      
       if (shouldRefresh) {
-        setPosts(newPosts);
+        setPosts(sortedPosts);
       } else {
-        setPosts(prev => [...prev, ...newPosts]);
+        setPosts(prev => {
+          // Combine and re-sort to ensure pinned posts stay at top
+          const combined = [...prev, ...sortedPosts];
+          return combined.sort((a, b) => {
+            if (a.pinned && !b.pinned) return -1;
+            if (!a.pinned && b.pinned) return 1;
+            return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+          });
+        });
       }
       
       setHasMore(newPosts.length > 0);

@@ -70,11 +70,15 @@ export interface Comment {
 export interface JanazaData {
   deceasedName: string;
   deceasedGender: 'male' | 'female';
-  prayerTime: string; // e.g. "After Dhuhr"
+  prayerTime: string; // e.g. "14h00" or "After Dhuhr"
+  prayerDate?: string; // ISO date string
   mosqueName: string;
+  mosqueAddress?: string; // Full address with postal code
   mosqueLocation: { lat: number; lng: number };
   cemeteryName?: string;
+  cemeteryAddress?: string; // Postal code or full address
   cemeteryLocation?: { lat: number; lng: number };
+  isRepatriation?: boolean; // If true, show "Rapatriment" instead of cemetery name
 }
 
 export interface SickVisitData {
@@ -149,6 +153,9 @@ export interface Post {
   comments: number;
   shares: number;
   isLiked?: boolean;
+  tags?: string[];
+  inAgenda?: boolean;
+  pinned?: boolean;
   
   // Type-specific data
   janazaData?: JanazaData;
@@ -297,18 +304,12 @@ export const socialService = {
       const from = (page - 1) * ITEM_LIMIT;
       const to = from + ITEM_LIMIT - 1;
 
+      const { data: session } = await supabase.auth.getSession();
+      const currentUserId = session.session?.user?.id;
+
       let query = supabase
         .from('posts')
-        .select(`
-          *,
-          user:profiles (
-            id,
-            full_name,
-            avatar_url,
-            is_admin,
-            is_verified
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
         .range(from, to);
 
@@ -317,52 +318,228 @@ export const socialService = {
       }
 
       const { data, error } = await query;
-
       if (error) throw error;
-      
-      let posts = data.map((p: any) => ({
+
+      const postIds = (data || []).map((p: any) => p.id);
+
+      // Fetch agenda info for current user
+      let agendaMap = new Map<string, { pinned: boolean }>();
+      if (currentUserId && postIds.length > 0) {
+        const { data: agendaData } = await supabase
+          .from('agenda_entries')
+          .select('post_id, pinned')
+          .eq('user_id', currentUserId)
+          .in('post_id', postIds);
+        agendaData?.forEach((row) => {
+          agendaMap.set(row.post_id, { pinned: !!row.pinned });
+        });
+      }
+
+      let posts = (data || []).map((p: any) => ({
         id: p.id,
-        type: p.type || 'standard',
+        type: (p.type as Post['type']) || 'standard',
         user: {
-          id: p.user?.id || 'unknown',
-          name: p.user?.full_name || 'Unknown User',
-          avatar: p.user?.avatar_url || 'https://i.pravatar.cc/150',
-          isVerified: p.user?.is_verified,
+          id: p.user_id || 'unknown',
+          name: p.metadata?.author || 'Umar',
+          avatar: p.metadata?.avatar || 'https://i.pravatar.cc/150',
+          isVerified: true,
         },
-        content: p.content,
-        image: p.image_url,
+        content: p.content || '',
+        image: p.image_url || undefined,
         timestamp: p.created_at,
         likes: p.likes_count || 0,
         comments: p.comments_count || 0,
         shares: 0,
-        isLiked: false, // TODO: Check likes table
+        isLiked: false,
+        tags: Array.isArray(p.metadata?.tags) ? p.metadata.tags : [],
         janazaData: p.type === 'janaza' ? p.metadata : undefined,
         sickVisitData: p.type === 'sick_visit' ? p.metadata : undefined,
-        location: (p.lat && p.lng) ? { lat: p.lat, lng: p.lng } : undefined,
+        location: p.lat && p.lng ? { lat: p.lat, lng: p.lng } : undefined,
+        inAgenda: agendaMap.has(p.id),
+        pinned: agendaMap.get(p.id)?.pinned || false,
       }));
 
-      // Client-side radius filtering
-      if (userLocation) {
-           posts = posts.filter((p: Post) => {
-             if (!p.location) return true; // Include posts without location? Probably standard posts yes.
-             if (p.type !== 'janaza' && p.type !== 'sick_visit') return true;
+      // Move pinned posts to top for this user
+      if (currentUserId) {
+        const pinned = posts.filter((p) => p.pinned);
+        const others = posts.filter((p) => !p.pinned);
+        posts = [...pinned, ...others];
+      }
 
-             const R = 6371; 
-             const dLat = (p.location.lat - userLocation.lat) * Math.PI / 180;
-             const dLon = (p.location.lng - userLocation.lng) * Math.PI / 180;
-             const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                       Math.cos(userLocation.lat * Math.PI / 180) * Math.cos(p.location.lat * Math.PI / 180) * 
-                       Math.sin(dLon/2) * Math.sin(dLon/2);
-             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-             const d = R * c;
-             return d <= 30; // 30km radius
-         });
+      // Optional radius filter for janaza/sick visits
+      if (userLocation) {
+        posts = posts.filter((p: Post) => {
+          if (!p.location) return true;
+          if (p.type !== 'janaza' && p.type !== 'sick_visit') return true;
+          const R = 6371;
+          const dLat = (p.location.lat - userLocation.lat) * Math.PI / 180;
+          const dLon = (p.location.lng - userLocation.lng) * Math.PI / 180;
+          const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(userLocation.lat * Math.PI / 180) *
+              Math.cos(p.location.lat * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          const d = R * c;
+          return d <= 30;
+        });
       }
 
       return posts;
     } catch (error) {
-       console.error('getPosts error:', error);
-       return [];
+      console.error('getPosts error:', error);
+      return [];
+    }
+  },
+
+  getAgendaPosts: async (): Promise<Post[]> => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) return [];
+      const userId = session.session.user.id;
+
+      const { data: agendaRows, error } = await supabase
+        .from('agenda_entries')
+        .select('post_id, pinned, created_at')
+        .eq('user_id', userId)
+        .order('pinned', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      if (!agendaRows || agendaRows.length === 0) return [];
+
+      const postIds = agendaRows.map((r) => r.post_id);
+      const { data: postData, error: postError } = await supabase
+        .from('posts')
+        .select('*')
+        .in('id', postIds);
+      if (postError) throw postError;
+
+      const agendaMap = new Map<string, { pinned: boolean; created_at: string }>();
+      agendaRows.forEach((r) => agendaMap.set(r.post_id, { pinned: r.pinned, created_at: r.created_at }));
+
+      let posts = (postData || []).map((p: any) => ({
+        id: p.id,
+        type: (p.type as Post['type']) || 'standard',
+        user: {
+          id: p.user_id || 'unknown',
+          name: p.metadata?.author || 'Umar',
+          avatar: p.metadata?.avatar || 'https://i.pravatar.cc/150',
+          isVerified: true,
+        },
+        content: p.content || '',
+        image: p.image_url || undefined,
+        timestamp: p.created_at,
+        likes: p.likes_count || 0,
+        comments: p.comments_count || 0,
+        shares: 0,
+        isLiked: false,
+        tags: Array.isArray(p.metadata?.tags) ? p.metadata.tags : [],
+        janazaData: p.type === 'janaza' ? p.metadata : undefined,
+        sickVisitData: p.type === 'sick_visit' ? p.metadata : undefined,
+        location: p.lat && p.lng ? { lat: p.lat, lng: p.lng } : undefined,
+        inAgenda: true,
+        pinned: agendaMap.get(p.id)?.pinned || false,
+      }));
+
+      // Sort pinned first, then by created_at descending from agenda
+      posts = posts.sort((a, b) => {
+        const aPin = a.pinned ? 1 : 0;
+        const bPin = b.pinned ? 1 : 0;
+        if (aPin !== bPin) return bPin - aPin;
+        const aCreated = agendaMap.get(a.id)?.created_at || '';
+        const bCreated = agendaMap.get(b.id)?.created_at || '';
+        return bCreated.localeCompare(aCreated);
+      });
+
+      return posts;
+    } catch (error) {
+      console.error('getAgendaPosts error:', error);
+      return [];
+    }
+  },
+
+  saveToAgenda: async (postId: string, pinned: boolean = false) => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) throw new Error('Not authenticated');
+      const userId = session.session.user.id;
+
+      const { error } = await supabase
+        .from('agenda_entries')
+        .upsert(
+          { user_id: userId, post_id: postId, pinned },
+          { onConflict: 'user_id,post_id' }
+        );
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('saveToAgenda error:', error);
+      return false;
+    }
+  },
+
+  removeFromAgenda: async (postId: string) => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) throw new Error('Not authenticated');
+      const userId = session.session.user.id;
+      const { error } = await supabase
+        .from('agenda_entries')
+        .delete()
+        .eq('user_id', userId)
+        .eq('post_id', postId);
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('removeFromAgenda error:', error);
+      return false;
+    }
+  },
+
+  setPinned: async (postId: string, pinned: boolean) => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) throw new Error('Not authenticated');
+      const userId = session.session.user.id;
+
+      // If pinning, first unpin all other posts (only one pinned at a time)
+      if (pinned) {
+        const { error: unpinError } = await supabase
+          .from('agenda_entries')
+          .update({ pinned: false })
+          .eq('user_id', userId)
+          .neq('post_id', postId);
+        if (unpinError) throw unpinError;
+      }
+
+      // Ensure post is in agenda before pinning
+      const { data: existing } = await supabase
+        .from('agenda_entries')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('post_id', postId)
+        .single();
+
+      if (existing) {
+        // Update existing entry
+        const { error } = await supabase
+          .from('agenda_entries')
+          .update({ pinned })
+          .eq('id', existing.id);
+        if (error) throw error;
+      } else {
+        // Create new entry
+        const { error } = await supabase
+          .from('agenda_entries')
+          .insert({ user_id: userId, post_id: postId, pinned });
+        if (error) throw error;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('setPinned error:', error);
+      return false;
     }
   },
 

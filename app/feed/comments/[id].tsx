@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Fonts } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
 import { Comment, socialService } from '@/services/socialService';
+import { toast } from '@/components/ui/Toast';
 
 // Localization
 import i18n from '@/locales/i18n';
@@ -52,7 +53,13 @@ export default function CommentsScreen() {
     if (!id) return;
     setLoading(true);
     const data = await socialService.getComments(id);
-    setComments(data);
+    // Sort: approved first, then pending, both by created_at ascending
+    const sorted = [...data].sort((a, b) => {
+      if (a.is_approved && !b.is_approved) return -1;
+      if (!a.is_approved && b.is_approved) return 1;
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
+    setComments(sorted);
     setLoading(false);
   };
 
@@ -66,12 +73,14 @@ export default function CommentsScreen() {
       setComments(prev => [...prev, addedComment]);
       setNewComment('');
       
-      // If pending, maybe show a toast or rely on the UI update
+      // If pending, show toast notification
       if (!addedComment.is_approved) {
-          Alert.alert("", t('comments.pendingAlert'));
+          toast.show({ type: 'info', message: t('comments.pendingAlert') });
+      } else {
+          toast.show({ type: 'success', message: t('comments.commentPosted') || 'Comment posted' });
       }
     } else {
-      Alert.alert("", t('comments.errorAlert'));
+      toast.show({ type: 'error', message: t('comments.errorAlert') });
     }
     setSubmitting(false);
   };
@@ -152,6 +161,16 @@ export default function CommentsScreen() {
         <View style={{ width: 40 }} /> 
       </View>
 
+      {/* Admin Verification Banner */}
+      {(type === 'janaza' || type === 'sick_visit') && (
+        <View style={[styles.adminBanner, { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.1)' }]}>
+          <Ionicons name="information-circle" size={18} color={colors.primary} style={{ marginRight: 8 }} />
+          <Text style={[styles.adminBannerText, { fontFamily: Fonts.regular, color: colors.text.primary }]}>
+            {t('feed.commentsReviewedByAdmin')}
+          </Text>
+        </View>
+      )}
+
       <FlatList
         data={comments}
         renderItem={renderItem}
@@ -204,6 +223,19 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  adminBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  adminBannerText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
   },
   backButton: {
     padding: 8,
