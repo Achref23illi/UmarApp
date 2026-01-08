@@ -2,13 +2,11 @@
  * Home Screen (Social Feed)
  * =========================
  * Main feed with infinite scroll and mixed content (posts + janaza).
- * Includes a compact prayer time header.
+ * Includes a modern header with search and prayer time banner.
  */
 
-import { Ionicons } from '@expo/vector-icons';
-import * as Location from 'expo-location';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Pressable,
@@ -19,17 +17,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { InfiniteFeed } from '@/components/feed/InfiniteFeed';
+import { PrayerBanner } from '@/components/prayer/PrayerBanner';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
 import { useAppSelector } from '@/store/hooks';
-
-interface PrayerTime {
-  name: string;
-  time: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  isNext?: boolean;
-  isCurrent?: boolean;
-}
+import { getReadingProgress, ReadingProgress } from '@/services/quranProgress';
 
 export default function HomeScreen() {
   const { t } = useTranslation();
@@ -43,111 +35,112 @@ export default function HomeScreen() {
   const fontSemiBold = getFont(currentLanguage, 'semiBold');
   const fontBold = getFont(currentLanguage, 'bold');
 
-  // State
-  const [location, setLocation] = useState<string>(t('common.loading'));
   const [locationCoords, setLocationCoords] = useState<{ lat: number; lng: number } | undefined>(undefined);
-  const [currentPrayer, setCurrentPrayer] = useState<{ name: string; time: string } | null>(null);
-  const [nextPrayer, setNextPrayer] = useState<{ name: string; time: string } | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [notificationCount, setNotificationCount] = useState(3); // TODO: Get from actual notifications
+  const [readingProgress, setReadingProgress] = useState<ReadingProgress | null>(null);
+  const userData = useAppSelector((state) => state.user);
 
-  // Get location and prayer times (Simplified Logic)
+  // Get location (for feed and prayer banner)
   useEffect(() => {
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
-          setLocation(t('prayer.locationDenied'));
-          setLoading(false);
           return;
         }
 
         const position = await Location.getCurrentPositionAsync({});
         const { latitude, longitude } = position.coords;
         setLocationCoords({ lat: latitude, lng: longitude });
-
-        const [address] = await Location.reverseGeocodeAsync({ latitude, longitude });
-        if (address) {
-          setLocation(address.city || address.district || 'Unknown');
-        }
-
-        // Fetch prayer times
-        const today = new Date();
-        const dateStr = `${today.getDate()}-${today.getMonth() + 1}-${today.getFullYear()}`;
-        
-        const response = await fetch(
-          `https://api.aladhan.com/v1/timings/${dateStr}?latitude=${latitude}&longitude=${longitude}&method=2`
-        );
-        const data = await response.json();
-
-        if (data.code === 200) {
-          const timings = data.data.timings;
-          
-          // Determine next prayer (Simple logic for demo)
-          setNextPrayer({ name: 'Asr', time: timings.Asr }); 
-          setCurrentPrayer({ name: 'Dhuhr', time: timings.Dhuhr });
-        }
       } catch (error) {
         console.error('Error fetching data:', error);
-      } finally {
-        setLoading(false);
       }
     })();
   }, []);
 
+  // Fetch reading progress when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      const fetchProgress = async () => {
+        const progress = await getReadingProgress();
+        setReadingProgress(progress);
+      };
+      fetchProgress();
+    }, [])
+  );
+
+  const handleContinueReading = () => {
+    if (readingProgress?.page) {
+      router.push({
+        pathname: '/quran/mushaf',
+        params: { initialPage: readingProgress.page.toString() }
+      });
+    } else {
+      router.push('/quran/mushaf');
+    }
+  };
+
   const FeedHeader = () => (
-    <View style={[styles.headerContainer, { paddingTop: insets.top + 10, backgroundColor: colors.background }]}>
-      <View style={styles.topRow}>
-        <View>
-          <Text style={[styles.greeting, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-            {t('home.greeting')},
-          </Text>
-          <Text style={[styles.appName, { fontFamily: fontBold, color: colors.primary }]}>
-            {t('common.appName')}
-          </Text>
-        </View>
-
-        <View style={styles.topRightActions}>
-             <View style={[styles.locationBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
-                <Ionicons name="location" size={14} color={colors.primary} />
-                <Text style={[styles.locationText, { fontFamily: fontMedium, color: colors.text.primary }]}>
-                  {location}
-                </Text>
-             </View>
-             <Pressable 
-                style={styles.bellButton}
-                onPress={() => router.push('/notifications')}
-             >
-                <Ionicons name="notifications-outline" size={24} color={colors.text.primary} />
-             </Pressable>
-        </View>
-      </View>
-
-      {/* Compact Prayer Status */}
-      <View style={[styles.prayerStatusCard, { backgroundColor: colors.surface }]}>
-        <View style={styles.prayerInfo}>
-            <Text style={[styles.nextLabel, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-                {t('prayer.nextPrayer')}
-            </Text>
-            <View style={styles.prayerNameRow}>
-                <Ionicons name="time-outline" size={18} color={colors.secondary} />
-                <Text style={[styles.nextPrayerName, { fontFamily: fontBold, color: colors.text.primary }]}>
-                    {nextPrayer ? nextPrayer.name : '...'}
-                </Text>
-                <Text style={[styles.nextPrayerTime, { fontFamily: fontMedium, color: colors.text.primary }]}>
-                    {nextPrayer ? nextPrayer.time : '--:--'}
-                </Text>
+    <View style={[styles.headerContainer, { paddingTop: insets.top, backgroundColor: colors.background }]}>
+      {/* Top Header: Profile, Search, Notifications */}
+      <View style={styles.topHeader}>
+        <Pressable onPress={() => router.push('/profile')} style={styles.profileButton}>
+          {userData.avatar_url ? (
+            <Image source={{ uri: userData.avatar_url }} style={styles.profileAvatar} contentFit="cover" />
+          ) : (
+            <View style={[styles.profileAvatarPlaceholder, { backgroundColor: colors.surface }]}>
+              <Ionicons name="person" size={24} color={colors.text.secondary} />
             </View>
-        </View>
+          )}
+        </Pressable>
+
         <Pressable 
-            onPress={() => router.push('/prayer')}
-            style={[styles.prayerButton, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}
+          onPress={() => router.push('/search')}
+          style={[styles.searchBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
         >
-            <Text style={[styles.prayerButtonText, { fontFamily: fontMedium, color: colors.primary }]}>
-                {t('feed.fullSchedule')}
-            </Text>
-            <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+          <Ionicons name="search-outline" size={18} color={colors.text.secondary} style={styles.searchIcon} />
+          <Text style={[styles.searchPlaceholder, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+            {t('common.search')}
+          </Text>
+          <Ionicons name="mic-outline" size={18} color={colors.text.secondary} style={styles.micIcon} />
+        </Pressable>
+
+        <Pressable 
+          onPress={() => router.push('/notifications')}
+          style={styles.notificationButton}
+        >
+          <Ionicons name="mail-outline" size={24} color={colors.text.primary} />
+          {notificationCount > 0 && (
+            <View style={[styles.badge, { backgroundColor: '#FF3B30' }]}>
+              <Text style={styles.badgeText}>{notificationCount > 9 ? '9+' : notificationCount}</Text>
+            </View>
+          )}
         </Pressable>
       </View>
+
+      {/* Prayer Time Banner */}
+      <PrayerBanner coords={locationCoords} />
+
+      {/* Continue Reading Card */}
+      <Pressable 
+        onPress={handleContinueReading}
+        style={[styles.quranCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      >
+        <View style={styles.quranCardContent}>
+          <View style={[styles.quranIconContainer, { backgroundColor: colors.primary + '15' }]}>
+            <Ionicons name="book" size={24} color={colors.primary} />
+          </View>
+          <View style={styles.quranTextContainer}>
+            <Text style={[styles.quranTitle, { fontFamily: fontSemiBold, color: colors.text.primary }]}>
+              Continue Reading Quran
+            </Text>
+            <Text style={[styles.quranSubtitle, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+              {readingProgress ? `Page ${readingProgress.page}` : 'Start reading'}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+        </View>
+      </Pressable>
     </View>
   );
 
@@ -171,80 +164,75 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
     marginBottom: 8,
   },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  greeting: {
-    fontSize: 14,
-  },
-  appName: {
-    fontSize: 24,
-  },
-  locationBadge: {
+  topHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    gap: 12,
+    marginBottom: 12,
+  },
+  profileButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  profileAvatar: {
+    width: '100%',
+    height: '100%',
     borderRadius: 20,
   },
-  locationText: {
-    fontSize: 12,
+  profileAvatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  topRightActions: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-  },
-  bellButton: {
-      padding: 4,
-  },
-  prayerStatusCard: {
+  searchBar: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  prayerInfo: {
-    gap: 4,
-  },
-  nextLabel: {
-    fontSize: 12,
-  },
-  prayerNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
     gap: 8,
   },
-  nextPrayerName: {
-    fontSize: 18,
+  searchIcon: {
+    marginRight: 4,
   },
-  nextPrayerTime: {
-    fontSize: 18,
+  searchPlaceholder: {
+    flex: 1,
+    fontSize: 15,
   },
-  prayerButton: {
-    flexDirection: 'row',
+  micIcon: {
+    marginLeft: 4,
+  },
+  notificationButton: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
+    justifyContent: 'center',
+    position: 'relative',
   },
-  prayerButtonText: {
-    fontSize: 12,
+  badge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: 'bold',
   },
   fab: {
     position: 'absolute',
@@ -261,5 +249,38 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 6,
     zIndex: 100,
+  },
+  quranCard: {
+    marginTop: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  quranCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  quranIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quranTextContainer: {
+    flex: 1,
+  },
+  quranTitle: {
+    fontSize: 16,
+    marginBottom: 2,
+  },
+  quranSubtitle: {
+    fontSize: 13,
   },
 });
