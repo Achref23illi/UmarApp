@@ -147,3 +147,86 @@ export async function updateReadingStreak(): Promise<number> {
     return 0;
   }
 }
+
+const DAILY_LOG_KEY = '@quran_daily_log';
+
+export interface DailyLog {
+  date: string;
+  ayahsRead: number;
+  durationSeconds: number;
+  lastUpdated: string;
+}
+
+// Get daily log for specific date (YYYY-MM-DD)
+export async function getDailyLog(date: string): Promise<DailyLog> {
+  try {
+    const allLogsStr = await AsyncStorage.getItem(DAILY_LOG_KEY);
+    const allLogs: Record<string, DailyLog> = allLogsStr ? JSON.parse(allLogsStr) : {};
+    
+    return allLogs[date] || {
+      date,
+      ayahsRead: 0,
+      durationSeconds: 0,
+      lastUpdated: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('Error getting daily log:', error);
+    return { date, ayahsRead: 0, durationSeconds: 0, lastUpdated: new Date().toISOString() };
+  }
+}
+
+// Log reading activity
+export async function logReadingActivity(ayahsCount: number, seconds: number): Promise<void> {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const allLogsStr = await AsyncStorage.getItem(DAILY_LOG_KEY);
+    const allLogs: Record<string, DailyLog> = allLogsStr ? JSON.parse(allLogsStr) : {};
+    
+    const currentLog = allLogs[today] || {
+      date: today,
+      ayahsRead: 0,
+      durationSeconds: 0,
+      lastUpdated: new Date().toISOString()
+    };
+
+    allLogs[today] = {
+      ...currentLog,
+      ayahsRead: currentLog.ayahsRead + ayahsCount,
+      durationSeconds: currentLog.durationSeconds + seconds,
+      lastUpdated: new Date().toISOString()
+    };
+
+    await AsyncStorage.setItem(DAILY_LOG_KEY, JSON.stringify(allLogs));
+  } catch (error) {
+    console.error('Error logging reading activity:', error);
+  }
+}
+
+// Get weekly stats
+export async function getWeeklyStats(): Promise<DailyLog[]> {
+  try {
+    const allLogsStr = await AsyncStorage.getItem(DAILY_LOG_KEY);
+    const allLogs: Record<string, DailyLog> = allLogsStr ? JSON.parse(allLogsStr) : {};
+    
+    const stats: DailyLog[] = [];
+    const today = new Date();
+    
+    // Get last 7 days
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      
+      stats.push(allLogs[dateStr] || {
+        date: dateStr,
+        ayahsRead: 0,
+        durationSeconds: 0,
+        lastUpdated: d.toISOString()
+      });
+    }
+    
+    return stats;
+  } catch (error) {
+    return [];
+  }
+}

@@ -21,7 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
 import { getSurah, QURAN_EDITIONS, SURAH_NAMES, SurahContent } from '@/services/quranLibrary';
-import { saveReadingProgress } from '@/services/quranProgress';
+import { saveReadingProgress, logReadingActivity, updateReadingStreak } from '@/services/quranProgress';
 import { useAppSelector } from '@/store/hooks';
 
 export default function QuranReaderScreen() {
@@ -35,6 +35,10 @@ export default function QuranReaderScreen() {
   }>();
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Tracking refs
+  const startTimeRef = useRef<number>(Date.now());
+  const ayahsReadRef = useRef<number>(0);
 
   const fontRegular = getFont(currentLanguage, 'regular');
   const fontMedium = getFont(currentLanguage, 'medium');
@@ -53,9 +57,25 @@ export default function QuranReaderScreen() {
   const surahMeta = SURAH_NAMES[surahNum - 1];
 
   useEffect(() => {
+    // Start tracking when screen mounts (or surah changes)
+    startTimeRef.current = Date.now();
+    ayahsReadRef.current = 0;
+
     if (editionId && surahNumber) {
       loadSurah();
     }
+
+    // Cleanup: Save progress when leaving the screen or changing surah
+    return () => {
+      const durationSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
+      if (durationSeconds > 5 || ayahsReadRef.current > 0) {
+        logReadingActivity(ayahsReadRef.current, durationSeconds);
+        // Also update streak if significant reading occurred
+        if (durationSeconds > 60) {
+          updateReadingStreak();
+        }
+      }
+    };
   }, [editionId, surahNumber]);
 
   const loadSurah = async () => {
@@ -89,6 +109,7 @@ export default function QuranReaderScreen() {
 
   const handleVersePress = async (verseNumber: number) => {
     setCurrentVerse(verseNumber);
+    ayahsReadRef.current += 1;
     
     await saveReadingProgress({
       surahNumber: surahNum,
