@@ -19,6 +19,7 @@ import { store } from '@/store';
 import { useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider } from 'react-redux';
+import { ToastHost } from '@/components/ui/Toast';
 
 // ... imports
 import i18n from '@/locales/i18n';
@@ -94,6 +95,7 @@ function ThemedApp() {
     <ThemeProvider value={NavTheme}>
       <AuthLoader>
         <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <ToastHost />
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="welcome" />
             <Stack.Screen name="auth/login" />

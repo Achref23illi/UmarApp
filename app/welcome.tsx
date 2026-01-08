@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,20 +23,23 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Images } from '@/config/assets';
+import { Colors } from '@/config/colors';
 import { Fonts } from '@/hooks/use-fonts';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { LanguageCode, setLanguage } from '@/store/slices/languageSlice';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Gold and Black colors
-const GOLD = '#F5C661';
-const BLACK = '#000000';
+// App colors
+const PRIMARY = Colors.palette.purple.primary; // #670FA4
+const GOLD = Colors.palette.gold.primary; // #F5C661
+const GRAY_TEXT = Colors.palette.neutral.gray700;
+const GRAY_LIGHT = Colors.palette.neutral.gray400;
 const WHITE = '#FFFFFF';
 
 interface Slide {
   id: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  illustration: any;
   translationKey: string;
 }
 
@@ -60,9 +62,9 @@ export default function WelcomeScreen() {
   const fontBold = isRTL ? Fonts.arabicBold : Fonts.bold;
 
   const slides: Slide[] = [
-    { id: '1', icon: 'time-outline', translationKey: '1' },
-    { id: '2', icon: 'book-outline', translationKey: '2' },
-    { id: '3', icon: 'people-outline', translationKey: '3' },
+    { id: '1', illustration: Images.illustration1, translationKey: '1' },
+    { id: '2', illustration: Images.illustration2, translationKey: '2' },
+    { id: '3', illustration: Images.illustration3, translationKey: '3' },
   ];
 
   // Language cycling
@@ -123,112 +125,97 @@ export default function WelcomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background Image */}
-      <Image source={Images.welcomeBackground} style={styles.backgroundImage} contentFit="cover" />
-
-      {/* Gradient Overlay */}
-      <LinearGradient
-        colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.85)', BLACK]}
-        locations={[0, 0.35, 0.65, 1]}
-        style={styles.gradient}
-        pointerEvents="none"
-      />
-
       {/* Top Bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
         {/* Language Switcher */}
         <Pressable onPress={cycleLanguage} style={styles.langButton}>
-          <Ionicons name="globe-outline" size={20} color={WHITE} />
-          <Text style={[styles.langText, { fontFamily: fontMedium }]}>
+          <Ionicons name="globe-outline" size={20} color={PRIMARY} />
+          <Text style={[styles.langText, { fontFamily: fontMedium, color: GRAY_TEXT }]}>
             {languageLabels[currentLanguage]}
           </Text>
         </Pressable>
 
         {/* Centered Logo */}
         <Image 
-          source={Images.logoWhite} 
+          source={Images.logo} 
           style={styles.logoTop} 
           contentFit="contain" 
         />
 
         {/* Skip Button */}
         <Pressable onPress={handleSkip} style={styles.skipButton}>
-          <Text style={[styles.skipText, { fontFamily: fontMedium }]}>
+          <Text style={[styles.skipText, { fontFamily: fontMedium, color: GRAY_TEXT }]}>
             {t('welcome.skip')}
           </Text>
         </Pressable>
       </View>
 
-      {/* Calligraphy */}
-      <View style={styles.calligraphyContainer} pointerEvents="none">
-        <Text style={[styles.calligraphy, { fontFamily: Fonts.arabicBold }]}>بِسْمِ اللَّهِ</Text>
-      </View>
-
-      {/* Slides */}
-      <Animated.FlatList
-        ref={flatListRef}
-        data={slides}
-        keyExtractor={(item) => item.id}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
-        bounces={false}
-        style={styles.flatList}
-        renderItem={({ item }) => (
-          <View style={[styles.slide, { width: SCREEN_WIDTH }]}>
-            <View style={styles.slideContent}>
-              {/* Icon with glow */}
-              <View style={styles.iconWrapper}>
-                <View style={styles.iconGlow} />
-                <Ionicons name={item.icon} size={80} color={GOLD} />
+      {/* Content */}
+      <View style={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
+        {/* Slides */}
+        <Animated.FlatList
+          ref={flatListRef}
+          data={slides}
+          keyExtractor={(item) => item.id}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
+          bounces={false}
+          style={styles.flatList}
+          contentContainerStyle={styles.flatListContent}
+          renderItem={({ item }) => (
+            <View style={[styles.slide, { width: SCREEN_WIDTH }]}>
+              <View style={styles.slideContent}>
+                {/* Illustration */}
+                <View style={styles.illustrationContainer}>
+                  <Image source={item.illustration} style={styles.illustration} contentFit="contain" />
+                </View>
+                {/* Text */}
+                <Text style={[styles.title, { fontFamily: fontBold, color: GRAY_TEXT }]}>
+                  {t(`welcome.slides.${item.translationKey}.title`)}
+                </Text>
+                <Text style={[styles.subtitle, { fontFamily: fontRegular, color: GRAY_LIGHT }]}>
+                  {t(`welcome.slides.${item.translationKey}.subtitle`)}
+                </Text>
               </View>
-              {/* Text */}
-              <Text style={[styles.title, { fontFamily: fontBold }]}>
-                {t(`welcome.slides.${item.translationKey}.title`)}
-              </Text>
-              <Text style={[styles.subtitle, { fontFamily: fontRegular }]}>
-                {t(`welcome.slides.${item.translationKey}.subtitle`)}
-              </Text>
             </View>
+          )}
+        />
+
+        {/* Bottom Controls */}
+        <View style={styles.bottomControls}>
+          {/* Pagination */}
+          <View style={styles.pagination}>
+            {slides.map((_, idx) => (
+              <PaginationDot key={idx.toString()} index={idx} />
+            ))}
           </View>
-        )}
-      />
 
-      {/* Bottom Controls */}
-      <View style={[styles.bottomControls, { paddingBottom: insets.bottom + 24 }]}>
-        {/* Pagination */}
-        <View style={styles.pagination}>
-          {slides.map((_, idx) => (
-            <PaginationDot key={idx.toString()} index={idx} />
-          ))}
-        </View>
+          {/* Next/Get Started Button */}
+          <Pressable onPress={handleNext} style={styles.nextButton}>
+            <Text style={[styles.nextButtonText, { fontFamily: fontSemiBold }]}>
+              {currentIndex === slides.length - 1 ? t('welcome.getStarted') : t('welcome.next')}
+            </Text>
+            <Ionicons
+              name={currentIndex === slides.length - 1 ? 'rocket-outline' : 'arrow-forward'}
+              size={22}
+              color={WHITE}
+            />
+          </Pressable>
 
-        {/* Next/Get Started Button */}
-        <Pressable onPress={handleNext} style={styles.nextButton}>
-          <Text style={[styles.nextButtonText, { fontFamily: fontSemiBold }]}>
-            {currentIndex === slides.length - 1 ? t('welcome.getStarted') : t('welcome.next')}
-          </Text>
-          <Ionicons
-            name={currentIndex === slides.length - 1 ? 'rocket-outline' : 'arrow-forward'}
-            size={22}
-            color={BLACK}
-          />
-        </Pressable>
-
-        {/* Login Link */}
-        {currentIndex === 0 && (
+          {/* Login Link */}
           <Animated.View entering={FadeInDown.delay(500)}>
             <Pressable onPress={() => router.push('/auth/login')} style={styles.loginLink}>
-              <Text style={[styles.loginText, { fontFamily: fontRegular }]}>
+              <Text style={[styles.loginText, { fontFamily: fontRegular, color: PRIMARY }]}>
                 {t('welcome.alreadyHaveAccount')}
               </Text>
             </Pressable>
           </Animated.View>
-        )}
+        </View>
       </View>
     </View>
   );
@@ -237,13 +224,7 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: BLACK,
-  },
-  backgroundImage: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  gradient: {
-    ...StyleSheet.absoluteFillObject,
+    backgroundColor: WHITE,
   },
   topBar: {
     position: 'absolute',
@@ -260,124 +241,116 @@ const styles = StyleSheet.create({
   langButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(103, 15, 164, 0.1)',
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 20,
     gap: 6,
   },
   langText: {
-    color: WHITE,
     fontSize: 14,
   },
   logoTop: {
-    width: 70,
-    height: 70,
+    width: 60,
+    height: 60,
   },
   skipButton: {
     paddingVertical: 8,
     paddingHorizontal: 12,
   },
   skipText: {
-    color: 'rgba(255,255,255,0.8)',
     fontSize: 16,
   },
-  calligraphyContainer: {
-    position: 'absolute',
-    top: SCREEN_HEIGHT * 0.18,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    opacity: 0.5,
-  },
-  calligraphy: {
-    fontSize: 30,
-    color: GOLD,
+  content: {
+    flex: 1,
+    paddingTop: 110,
   },
   flatList: {
     flex: 1,
     zIndex: 10,
   },
+  flatListContent: {
+    paddingBottom: 12,
+  },
   slide: {
     flex: 1,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
+    paddingTop: 100,
   },
   slideContent: {
     alignItems: 'center',
-    paddingHorizontal: 32,
-    paddingBottom: 200,
+    paddingHorizontal: 24,
+    paddingTop: 20,
   },
-  iconWrapper: {
-    marginBottom: 32,
+  illustrationContainer: {
+    width: SCREEN_WIDTH * 0.85,
+    height: SCREEN_WIDTH * 0.85,
+    marginBottom: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconGlow: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: GOLD,
-    opacity: 0.15,
+  illustration: {
+    width: '100%',
+    height: '100%',
   },
   title: {
-    fontSize: 26,
-    color: WHITE,
+    fontSize: 24,
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
+    paddingHorizontal: 16,
   },
   subtitle: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
+    fontSize: 15,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
+    paddingHorizontal: 20,
   },
   bottomControls: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 100,
     paddingHorizontal: 24,
     alignItems: 'center',
+    backgroundColor: WHITE,
+    paddingTop: 16,
+    paddingBottom: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 5,
   },
   pagination: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 24,
+    gap: 6,
+    marginBottom: 20,
   },
   dot: {
     height: 8,
     borderRadius: 4,
-    backgroundColor: GOLD,
+    backgroundColor: PRIMARY,
   },
   nextButton: {
-    backgroundColor: GOLD,
+    backgroundColor: PRIMARY,
     width: '100%',
     height: 56,
-    borderRadius: 28,
+    borderRadius: 30,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    marginBottom: 16,
-    shadowColor: BLACK,
+    gap: 8,
+    marginBottom: 12,
+    shadowColor: PRIMARY,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 6,
+    elevation: 8,
   },
   nextButtonText: {
-    color: BLACK,
-    fontSize: 18,
+    color: WHITE,
+    fontSize: 17,
+    fontWeight: '600',
   },
   loginLink: {
-    paddingVertical: 8,
+    paddingVertical: 10,
   },
   loginText: {
-    color: WHITE,
-    fontSize: 14,
-    textDecorationLine: 'underline',
+    fontSize: 15,
   },
 });

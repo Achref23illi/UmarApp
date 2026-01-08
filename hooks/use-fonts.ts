@@ -1,14 +1,3 @@
-import {
-  Poppins_100Thin,
-  Poppins_200ExtraLight,
-  Poppins_300Light,
-  Poppins_400Regular,
-  Poppins_500Medium,
-  Poppins_600SemiBold,
-  Poppins_700Bold,
-  Poppins_800ExtraBold,
-  Poppins_900Black,
-} from '@expo-google-fonts/poppins';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
@@ -25,6 +14,16 @@ import Cairo_600SemiBold from '@expo-google-fonts/cairo/600SemiBold/Cairo_600Sem
 // @ts-ignore
 import Cairo_700Bold from '@expo-google-fonts/cairo/700Bold/Cairo_700Bold.ttf';
 
+// Metropolis (Latin) - local assets
+// @ts-ignore
+import Metropolis_Light from '@/assets/fonts/Metropolis-Light.otf';
+// @ts-ignore
+import Metropolis_Regular from '@/assets/fonts/Metropolis-Regular.otf';
+// @ts-ignore
+import Metropolis_Medium from '@/assets/fonts/Metropolis-Medium.otf';
+// @ts-ignore
+import Metropolis_Bold from '@/assets/fonts/Metropolis-Bold.otf';
+
 // Keep the splash screen visible while loading fonts
 SplashScreen.preventAutoHideAsync();
 
@@ -34,16 +33,11 @@ SplashScreen.preventAutoHideAsync();
  */
 export function useAppFonts() {
   const [fontsLoaded, fontError] = useFonts({
-    // Poppins (English & French)
-    Poppins_100Thin,
-    Poppins_200ExtraLight,
-    Poppins_300Light,
-    Poppins_400Regular,
-    Poppins_500Medium,
-    Poppins_600SemiBold,
-    Poppins_700Bold,
-    Poppins_800ExtraBold,
-    Poppins_900Black,
+    // Metropolis (English & French)
+    'Metropolis-Light': Metropolis_Light,
+    'Metropolis-Regular': Metropolis_Regular,
+    'Metropolis-Medium': Metropolis_Medium,
+    'Metropolis-Bold': Metropolis_Bold,
     // Cairo (Arabic) - imported directly to avoid broken package
     Cairo_300Light,
     Cairo_400Regular,
@@ -66,16 +60,12 @@ export function useAppFonts() {
 
 // Font family mapping for easy use
 export const Fonts = {
-  // Poppins weights
-  thin: 'Poppins_100Thin',
-  extraLight: 'Poppins_200ExtraLight',
-  light: 'Poppins_300Light',
-  regular: 'Poppins_400Regular',
-  medium: 'Poppins_500Medium',
-  semiBold: 'Poppins_600SemiBold',
-  bold: 'Poppins_700Bold',
-  extraBold: 'Poppins_800ExtraBold',
-  black: 'Poppins_900Black',
+  // Metropolis weights (Latin)
+  light: 'Metropolis-Light',
+  regular: 'Metropolis-Regular',
+  medium: 'Metropolis-Medium',
+  semiBold: 'Metropolis-Bold', // closest available weight
+  bold: 'Metropolis-Bold',
   // Arabic font weights
   arabicLight: 'Cairo_300Light',
   arabicRegular: 'Cairo_400Regular',

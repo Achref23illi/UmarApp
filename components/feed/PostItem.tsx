@@ -8,7 +8,9 @@ import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } 
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
 import { Post, socialService } from '@/services/socialService';
-import { useAppSelector } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { setInAgenda, setPinned as setPinnedAction } from '@/store/slices/agendaSlice';
+import { toast } from '@/components/ui/Toast';
 
 interface PostItemProps {
   post: Post;
@@ -25,6 +27,7 @@ export function PostItem({ post }: PostItemProps) {
   const { t } = useTranslation();
   const { colors, isDark } = useTheme();
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
+  const dispatch = useAppDispatch();
   useEffect(() => {
     socialService.getUser().then((u) => setCurrentUser(u));
   }, []);
@@ -37,6 +40,8 @@ export function PostItem({ post }: PostItemProps) {
   const [isLiked, setIsLiked] = useState(post.isLiked);
   const [likesCount, setLikesCount] = useState(post.likes);
   const [isVisible, setIsVisible] = useState(true);
+  const [isPinned, setIsPinned] = useState(!!post.pinned);
+  const [inAgenda, setInAgendaState] = useState(!!post.inAgenda);
   const scale = useSharedValue(1);
 
   const heartStyle = useAnimatedStyle(() => ({
@@ -65,6 +70,19 @@ export function PostItem({ post }: PostItemProps) {
     );
 
     socialService.likePost(post.id);
+  };
+
+  const togglePin = async () => {
+    const next = !isPinned;
+    const ok = await socialService.setPinned(post.id, next);
+    if (ok) {
+      setIsPinned(next);
+      setInAgendaState(true);
+      dispatch(setPinnedAction({ postId: post.id, pinned: next }));
+      toast.show({ type: 'success', message: next ? t('feed.pinned') : t('feed.unpinned') });
+    } else {
+      toast.show({ type: 'error', message: t('common.error') });
+    }
   };
 
   const handleShare = () => {
@@ -104,6 +122,7 @@ export function PostItem({ post }: PostItemProps) {
   };
 
   const isEvent = post.type === 'event';
+  const tags = post.tags && post.tags.length ? post.tags : [];
   
   return (
     <View style={[
@@ -134,6 +153,10 @@ export function PostItem({ post }: PostItemProps) {
                     <Text style={[styles.badgeText, { color: colors.primary, fontFamily: fontMedium }]}>{t('feed.official')}</Text>
                 </View>
             )}
+            <View style={{ flex: 1 }} />
+            <Pressable style={[styles.pinButton, { backgroundColor: colors.primary }]} onPress={togglePin}>
+              <Ionicons name={isPinned ? 'pin' : 'pin-outline'} size={16} color="#FFF" />
+            </Pressable>
           </View>
           <Text style={[styles.time, { fontFamily: fontRegular, color: colors.text.secondary }]}>
             {formatTime(post.timestamp)}
@@ -150,6 +173,13 @@ export function PostItem({ post }: PostItemProps) {
       <Text style={[styles.content, { fontFamily: fontRegular, color: colors.text.primary }]}>
         {post.content}
       </Text>
+
+      {/* Tags */}
+      {tags.length > 0 && (
+        <Text style={[styles.tags, { fontFamily: fontMedium, color: colors.primary }]}>
+          {tags.join(' ')}
+        </Text>
+      )}
 
       {/* Media Image */}
       {post.image && (
@@ -234,6 +264,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
   },
+  tags: {
+    paddingHorizontal: 16,
+    marginTop: -4,
+    marginBottom: 10,
+    fontSize: 12,
+    lineHeight: 16,
+  },
   postImage: {
     width: '100%',
     height: 250,
@@ -267,5 +304,12 @@ const styles = StyleSheet.create({
   badgeText: {
       fontSize: 10,
       fontWeight: '600',
+  },
+  pinButton: {
+    padding: 6,
+    borderRadius: 16,
+    minWidth: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   }
 });

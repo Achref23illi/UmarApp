@@ -27,21 +27,22 @@
     "female": "Femme",
     "brother": "Frère",
     "sister": "Sœur",
-    "quickActions": "Actions Rapides"
+    "quickActions": "Actions Rapides",
+    "search": "Recherche"
   },
   "welcome": {
     "slides": {
       "1": {
-        "title": "La Prière est la Clé du Succès",
-        "subtitle": "Obtenez des horaires de prière précis selon votre localisation et ne manquez plus jamais une prière."
+        "title": "Fil Communautaire Islamique",
+        "subtitle": "Restez connecté avec du contenu islamique sélectionné, des annonces et des mises à jour communautaires partagées par les administrateurs."
       },
       "2": {
-        "title": "Connectez-vous avec Votre Créateur",
-        "subtitle": "Lisez le Coran avec traductions, tafsir et récitations audio par des récitateurs de renommée mondiale."
+        "title": "Apprenez et Testez Vos Connaissances",
+        "subtitle": "Relevez le défi avec des quiz islamiques, gagnez des points et approfondissez votre compréhension de l'Islam."
       },
       "3": {
-        "title": "Trouvez la Paix dans la Communauté",
-        "subtitle": "Découvrez les mosquées à proximité, les lieux halal et rejoignez une communauté de croyants solidaire."
+        "title": "Compagnon Islamique Complet",
+        "subtitle": "Horaires de prière, Coran, Qibla, Duas, calendrier islamique et plus encore - tout en un seul endroit."
       }
     },
     "getStarted": "Commencer",
@@ -50,6 +51,10 @@
     "alreadyHaveAccount": "J'ai déjà un compte"
   },
   "auth": {
+    "tabs": {
+      "register": "Inscription",
+      "login": "Connexion"
+    },
     "login": {
       "title": "Bon Retour",
       "subtitle": "Connectez-vous pour continuer votre parcours",
@@ -65,6 +70,10 @@
     "register": {
       "title": "Créer un Compte",
       "subtitle": "Rejoignez notre communauté de croyants",
+      "genderModal": {
+        "title": "Êtes-vous ?",
+        "confirm": "Valider"
+      },
       "name": "Nom Complet",
       "namePlaceholder": "Entrez votre nom",
       "email": "Email",
@@ -77,7 +86,19 @@
       "haveAccount": "Vous avez déjà un compte ?",
       "signIn": "Se Connecter",
       "terms": "En créant un compte, vous acceptez nos",
-      "termsLink": "Conditions et Politique de Confidentialité"
+      "termsLink": "Conditions et Politique de Confidentialité",
+      "selectCountry": "Sélectionner un Pays",
+      "searchCountry": "Rechercher un pays...",
+      "selectBirthday": "Sélectionnez Votre Date de Naissance",
+      "day": "Jour",
+      "month": "Mois",
+      "year": "Année",
+      "age": "Âge",
+      "yearsOld": "ans",
+      "phone": "Numéro de Téléphone",
+      "phonePlaceholder": "Entrez le numéro de téléphone",
+      "birthday": "Date de Naissance",
+      "birthdayPlaceholder": "Sélectionnez votre date de naissance"
     },
     "social": {
       "google": "Continuer avec Google",
@@ -315,6 +336,12 @@
     "janaza": "Annonce Janaza",
     "fullSchedule": "Calendrier Complet",
     "share": "Partager",
+    "addedToAgenda": "Ajouté à l'agenda",
+    "removedFromAgenda": "Retiré de l'agenda",
+    "pinned": "Épinglé en haut",
+    "unpinned": "Désépinglé",
+    "commentsReviewedByAdmin": "Les commentaires sont vérifiés par l'admin.",
+    "locationNotAvailable": "Localisation non disponible",
     "createPost": "Créer un Post",
     "whatsOnYourMind": "À quoi pensez-vous ?",
     "official": "Officiel",
@@ -327,6 +354,7 @@
     "janazaAlert": "ALERTE JANAZA",
     "postedBy": "Publié par",
     "burial": "Enterrement",
+    "repatriation": "Rapatriment",
     "location": "Lieu",
     "addPhoto": "Ajouter une photo",
     "janazaSubtitle": "Marquer comme annonce funéraire",
@@ -347,7 +375,15 @@
     "addSpecificInstructions": "Ajouter des instructions spécifiques (Optionnel)...",
     "addMessageForCommunity": "Ajouter un message pour la communauté...",
     "postCreated": "Publication créée avec succès",
-    "postFailed": "Échec de la création de la publication"
+    "postFailed": "Échec de la création de la publication",
+    "merit": "Mérite",
+    "meritTitle": "Le mérite d'assister aux cérémonies funéraires",
+    "meritBismillah": "Au nom d'Allah, le Tout Miséricordieux, le Très Miséricordieux.",
+    "meritContent": "D'après Abou Houreira (qu'Allah l'agrée), le Prophète (que la prière d'Allah et Son salut soient sur lui) a dit : « Celui qui assiste à des funérailles jusqu'à ce que l'on prie sur le mort a un qirat et celui qui y assiste jusqu'à l'enterrement a deux qirat (*) ».\n\nQuelqu'un a dit : Qu'est ce que deux qirat ? Le Prophète (que la prière d'Allah et Son salut soient sur lui) a dit : « Comme deux immenses montagnes ».",
+    "meritSource": "(Rapporté par Mouslim dans son Sahih n°945)",
+    "meritFootnote": "(*) C'est à dire de récompense",
+    "pinned": "Publication épinglée",
+    "unpinned": "Publication désépinglée"
   },
   "time": {
     "justNow": "À l'instant",

@@ -28,38 +28,11 @@ export default function TabLayout() {
           />
         )}
       >
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: t('common.home'),
-          }}
-        />
-        <Tabs.Screen
-          name="quizzes"
-          options={{
-            title: 'Quizzes',
-          }}
-        />
-        <Tabs.Screen
-          name="mosques"
-          options={{
-            title: t('mosques.title'),
-            tabBarStyle: { display: 'none' },
-          }}
-        />
-        <Tabs.Screen
-            name="settings"
-            options={{
-                title: t('settings.title'),
-            }}
-        />
-        {/* Hide explore from tabs - accessed via rotary dial */}
-        <Tabs.Screen
-          name="explore"
-          options={{
-            href: null,
-          }}
-        />
+        <Tabs.Screen name="index" options={{ title: t('common.home') }} />
+        <Tabs.Screen name="agenda" options={{ title: 'Agenda' }} />
+        <Tabs.Screen name="challenges" options={{ title: 'Challenges' }} />
+        <Tabs.Screen name="quizz" options={{ title: 'Quizz' }} />
+        <Tabs.Screen name="salat" options={{ title: 'Salat' }} />
       </Tabs>
     </View>
   );

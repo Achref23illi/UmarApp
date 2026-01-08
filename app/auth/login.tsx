@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+    ActivityIndicator,
     Alert,
-    Dimensions,
     KeyboardAvoidingView,
     Platform,
     Pressable,
@@ -15,18 +16,23 @@ import {
     TextInput,
     View
 } from 'react-native';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AuthTabs } from '@/components/auth/AuthTabs';
 import { Images } from '@/config/assets';
+import { Colors } from '@/config/colors';
 import { Fonts } from '@/hooks/use-fonts';
 import { useGoogleAuth } from '@/hooks/use-google-auth';
-import { useTheme } from '@/hooks/use-theme';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { loginUser } from '@/store/slices/userSlice';
 import { checkUserProviders } from '@/utils/auth-checks';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const PURPLE = Colors.palette.purple.primary;
+const PURPLE_DARK = Colors.palette.purple.dark;
+const PURPLE_LIGHT = Colors.palette.purple.light;
+const GOLD = Colors.palette.gold.primary;
+const WHITE = Colors.palette.neutral.white;
 
 export default function LoginScreen() {
   const { t } = useTranslation();
@@ -36,27 +42,32 @@ export default function LoginScreen() {
   const { isLoading, error } = useAppSelector((state) => state.user);
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
   const { handleGoogleLogin } = useGoogleAuth();
-  const { colors, isDark } = useTheme();
   
-  // Show error effect
-  if (error) {
-     Alert.alert(t('common.error'), error, [
-         { text: 'OK', onPress: () => { /* dispatch clearError */ } }
-     ]);
-  }
+  useEffect(() => {
+    if (!error) return;
+    Alert.alert(t('common.error'), error, [{ text: 'OK' }]);
+  }, [error, t]);
 
   const isRTL = currentLanguage === 'ar';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [focusedInput, setFocusedInput] = useState<string | null>(null);
+  const [focusedInput, setFocusedInput] = useState<'email' | 'password' | null>(null);
 
   // Fonts
   const fontRegular = isRTL ? Fonts.arabicRegular : Fonts.regular;
   const fontMedium = isRTL ? Fonts.arabicMedium : Fonts.medium;
   const fontSemiBold = isRTL ? Fonts.arabicSemiBold : Fonts.semiBold;
   const fontBold = isRTL ? Fonts.arabicBold : Fonts.bold;
+
+  const tabLabels = useMemo(
+    () => ({
+      register: t('auth.tabs.register'),
+      login: t('auth.tabs.login'),
+    }),
+    [t]
+  );
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -92,174 +103,125 @@ export default function LoginScreen() {
     }
   };
 
-
-  // Check if screen is small (for compact layout)
-  const isSmallScreen = SCREEN_HEIGHT < 700;
-
-  // Dynamic Background Gradient
-  const gradientColors = (isDark 
-    ? [colors.background, '#1A1A2E', colors.background]
-    : [colors.background, colors.surface, colors.background]) as [string, string, string];
-
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Background */}
-      <LinearGradient
-        colors={gradientColors}
-        style={styles.gradient}
-      />
+    <View style={styles.container}>
+      <LinearGradient colors={[PURPLE_LIGHT, PURPLE, PURPLE_DARK]} style={styles.gradient} />
+      <StatusBar style="light" />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-        <View style={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}>
-          {/* Back Button */}
-          <Animated.View entering={FadeInUp.delay(100)}>
-            <Pressable 
-              onPress={() => router.back()} 
-              style={[styles.backButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
-            >
-              <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={colors.text.primary} />
-            </Pressable>
-          </Animated.View>
-
-          {/* Logo & Header */}
-          <Animated.View entering={FadeInDown.delay(200)} style={styles.header}>
+        <View style={[styles.content, { paddingTop: insets.top + 18, paddingBottom: insets.bottom + 18 }]}>
+          {/* Brand */}
+          <Animated.View entering={FadeInDown.duration(450)} style={styles.header}>
             <Image
-              source={Images.logo}
-              style={[styles.logo, isSmallScreen && styles.logoSmall]}
+              source={Images.logoWhite}
+              style={styles.logo}
               contentFit="contain"
             />
-            <Text style={[styles.title, { fontFamily: fontBold, color: colors.text.primary }, isSmallScreen && styles.titleSmall]}>
-              {t('auth.login.title')}
-            </Text>
-            <Text style={[styles.subtitle, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-              {t('auth.login.subtitle')}
-            </Text>
           </Animated.View>
 
-          {/* Form */}
-          <Animated.View entering={FadeInDown.delay(300)} style={styles.form}>
-            {/* Email Input */}
-            <View style={styles.inputWrapper}>
-              <Text style={[styles.inputLabel, { fontFamily: fontMedium, color: colors.text.secondary }]}>
-                {t('auth.login.email')}
-              </Text>
-              <View
-                style={[
-                  styles.inputContainer,
-                  { 
-                    backgroundColor: colors.input.background, 
-                    borderColor: focusedInput === 'email' ? colors.secondary : colors.input.border 
-                  },
-                  focusedInput === 'email' && { backgroundColor: isDark ? 'rgba(245,198,97,0.05)' : colors.input.background }
-                ]}
-              >
-                <Ionicons name="mail-outline" size={20} color={colors.input.placeholder} style={styles.inputIcon} />
-                <TextInput
-                  style={[styles.input, { fontFamily: fontRegular, color: colors.text.primary }]}
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder={t('auth.login.emailPlaceholder')}
-                  placeholderTextColor={colors.input.placeholder}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  onFocus={() => setFocusedInput('email')}
-                  onBlur={() => setFocusedInput(null)}
-                />
-              </View>
+          {/* Tabs */}
+          <Animated.View entering={FadeInDown.delay(80).duration(450)} style={styles.tabs}>
+            <AuthTabs
+              active="login"
+              labels={tabLabels}
+              onChange={(tab) => {
+                if (tab === 'register') router.replace('/auth/register');
+              }}
+            />
+          </Animated.View>
+
+          {/* Card */}
+          <Animated.View entering={FadeInDown.delay(160).duration(450)} style={styles.card}>
+            <Text style={[styles.cardTitle, { fontFamily: fontBold }]}>{t('auth.login.title')}</Text>
+            <Text style={[styles.cardSubtitle, { fontFamily: fontRegular }]}>{t('auth.login.subtitle')}</Text>
+
+            <View style={[styles.field, focusedInput === 'email' && styles.fieldFocused]}>
+              <Ionicons name="mail-outline" size={20} color="rgba(255,255,255,0.9)" />
+              <TextInput
+                style={[styles.input, { fontFamily: fontRegular }]}
+                value={email}
+                onChangeText={setEmail}
+                placeholder={t('auth.login.emailPlaceholder')}
+                placeholderTextColor="rgba(255,255,255,0.65)"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                onFocus={() => setFocusedInput('email')}
+                onBlur={() => setFocusedInput(null)}
+                textAlign={isRTL ? 'right' : 'left'}
+              />
             </View>
 
-            {/* Password Input */}
-            <View style={styles.inputWrapper}>
-              <View style={styles.passwordLabelRow}>
-                <Text style={[styles.inputLabel, { fontFamily: fontMedium, color: colors.text.secondary }]}>
-                  {t('auth.login.password')}
-                </Text>
-                <Pressable onPress={() => router.push('/auth/forgot-password')}>
-                  <Text style={[styles.forgotText, { fontFamily: fontMedium, color: colors.secondary }]}>
-                    {t('auth.login.forgotPassword')}
-                  </Text>
-                </Pressable>
-              </View>
-              <View
-                style={[
-                  styles.inputContainer,
-                  { 
-                    backgroundColor: colors.input.background, 
-                    borderColor: focusedInput === 'password' ? colors.secondary : colors.input.border 
-                  },
-                  focusedInput === 'password' && { backgroundColor: isDark ? 'rgba(245,198,97,0.05)' : colors.input.background }
-                ]}
-              >
-                <Ionicons name="lock-closed-outline" size={20} color={colors.input.placeholder} style={styles.inputIcon} />
-                <TextInput
-                  style={[styles.input, { fontFamily: fontRegular, color: colors.text.primary }]}
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder={t('auth.login.passwordPlaceholder')}
-                  placeholderTextColor={colors.input.placeholder}
-                  secureTextEntry={!showPassword}
-                  onFocus={() => setFocusedInput('password')}
-                  onBlur={() => setFocusedInput(null)}
+            <View style={[styles.field, focusedInput === 'password' && styles.fieldFocused]}>
+              <Ionicons name="lock-closed-outline" size={20} color="rgba(255,255,255,0.9)" />
+              <TextInput
+                style={[styles.input, { fontFamily: fontRegular }]}
+                value={password}
+                onChangeText={setPassword}
+                placeholder={t('auth.login.passwordPlaceholder')}
+                placeholderTextColor="rgba(255,255,255,0.65)"
+                secureTextEntry={!showPassword}
+                onFocus={() => setFocusedInput('password')}
+                onBlur={() => setFocusedInput(null)}
+                textAlign={isRTL ? 'right' : 'left'}
+              />
+              <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton} hitSlop={10}>
+                <Ionicons
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  size={20}
+                  color="rgba(255,255,255,0.75)"
                 />
-                <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
-                  <Ionicons
-                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                    size={20}
-                    color={colors.input.placeholder}
-                  />
-                </Pressable>
-              </View>
+              </Pressable>
             </View>
 
-            {/* Login Button */}
-            <Pressable onPress={handleLogin} style={[styles.loginButton, { backgroundColor: colors.secondary }]}>
-              <Text style={[styles.loginButtonText, { fontFamily: fontSemiBold, color: isDark ? '#000' : '#000' }]}>
-                {t('auth.login.signIn')}
-              </Text>
-              <Ionicons name="arrow-forward" size={20} color="#000" />
-            </Pressable>
-          </Animated.View>
+            <View style={styles.actionsRow}>
+              <Pressable onPress={() => router.push('/auth/forgot-password')} hitSlop={10}>
+                <Text style={[styles.link, { fontFamily: fontMedium }]}>{t('auth.login.forgotPassword')}</Text>
+              </Pressable>
+            </View>
 
-          {/* Divider */}
-          <Animated.View entering={FadeInDown.delay(400)} style={styles.divider}>
-            <View style={[styles.dividerLine, { backgroundColor: colors.divider }]} />
-            <Text style={[styles.dividerText, { fontFamily: fontRegular, color: colors.text.disabled }]}>
-              {t('common.or')}
-            </Text>
-            <View style={[styles.dividerLine, { backgroundColor: colors.divider }]} />
-          </Animated.View>
-
-          {/* Social Buttons - Side by Side */}
-          <Animated.View entering={FadeInDown.delay(500)} style={styles.socialContainer}>
-            <Pressable 
-              style={[styles.socialButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : colors.surface, borderColor: colors.border }]} 
-              onPress={handleGoogleLogin}
+            <Pressable
+              onPress={handleLogin}
+              disabled={isLoading}
+              style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed, isLoading && styles.ctaDisabled]}
             >
-              <Ionicons name="logo-google" size={22} color={colors.text.primary} />
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#000" />
+              ) : (
+                <>
+                  <Text style={[styles.ctaText, { fontFamily: fontSemiBold }]}>{t('auth.login.signIn')}</Text>
+                  <Ionicons name={isRTL ? 'arrow-back' : 'arrow-forward'} size={20} color="#000" />
+                </>
+              )}
             </Pressable>
 
-            {/* <Pressable style={styles.socialButton}>
-              <Ionicons name="logo-apple" size={22} color={WHITE} />
-            </Pressable> */}
-          </Animated.View>
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={[styles.dividerText, { fontFamily: fontRegular }]}>{t('common.or')}</Text>
+              <View style={styles.dividerLine} />
+            </View>
 
-          {/* Spacer to push signup to bottom */}
-          <View style={styles.spacer} />
+            <View style={styles.socialRow}>
+              <Pressable onPress={handleGoogleLogin} style={({ pressed }) => [styles.socialButton, pressed && styles.socialPressed]}>
+                <Ionicons name="logo-google" size={20} color={WHITE} />
+              </Pressable>
+              <Pressable disabled style={styles.socialButtonDisabled}>
+                <Ionicons name="logo-apple" size={20} color="rgba(255,255,255,0.45)" />
+              </Pressable>
+              <Pressable disabled style={styles.socialButtonDisabled}>
+                <Ionicons name="logo-facebook" size={20} color="rgba(255,255,255,0.45)" />
+              </Pressable>
+            </View>
 
-          {/* Sign Up Link */}
-          <Animated.View entering={FadeInDown.delay(600)} style={styles.signupContainer}>
-            <Text style={[styles.signupText, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-              {t('auth.login.noAccount')}{' '}
-            </Text>
-            <Pressable onPress={() => router.push('/auth/register')}>
-              <Text style={[styles.signupLink, { fontFamily: fontSemiBold, color: colors.secondary }]}>
-                {t('auth.login.signUp')}
-              </Text>
-            </Pressable>
+            <View style={styles.bottomRow}>
+              <Text style={[styles.bottomText, { fontFamily: fontRegular }]}>{t('auth.login.noAccount')}</Text>
+              <Pressable onPress={() => router.replace('/auth/register')} hitSlop={10}>
+                <Text style={[styles.bottomLink, { fontFamily: fontSemiBold }]}>{t('auth.login.signUp')}</Text>
+              </Pressable>
+            </View>
           </Animated.View>
         </View>
       </KeyboardAvoidingView>
@@ -281,132 +243,156 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
   },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
   header: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 18,
   },
   logo: {
-    width: 70,
-    height: 70,
-    marginBottom: 16,
-  },
-  logoSmall: {
     width: 56,
     height: 56,
-    marginBottom: 12,
   },
-  title: {
-    fontSize: 26,
+  tabs: {
+    width: '100%',
+    marginBottom: 18,
+  },
+  card: {
+    width: '100%',
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 16,
+  },
+  cardTitle: {
+    color: WHITE,
+    fontSize: 20,
+    textAlign: 'center',
     marginBottom: 6,
   },
-  titleSmall: {
-    fontSize: 22,
-  },
-  subtitle: {
-    fontSize: 15,
+  cardSubtitle: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 13,
     textAlign: 'center',
+    marginBottom: 18,
   },
-  form: {
-    marginBottom: 16,
-  },
-  inputWrapper: {
-    marginBottom: 16,
-  },
-  passwordLabelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  inputLabel: {
-    fontSize: 14,
-  },
-  inputContainer: {
+  field: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    height: 52,
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.25)',
+    paddingVertical: 12,
+    marginBottom: 14,
   },
-  inputIcon: {
-    marginRight: 10,
+  fieldFocused: {
+    borderBottomColor: GOLD,
   },
   input: {
     flex: 1,
     fontSize: 15,
+    color: WHITE,
+    paddingVertical: 4,
   },
   eyeButton: {
     padding: 4,
   },
-  forgotText: {
-    fontSize: 13,
+  actionsRow: {
+    alignItems: 'flex-end',
+    marginTop: -6,
+    marginBottom: 14,
   },
-  loginButton: {
-    height: 52,
-    borderRadius: 26,
+  link: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 13,
+    textDecorationLine: 'underline',
+  },
+  cta: {
+    height: 54,
+    borderRadius: 16,
+    backgroundColor: GOLD,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginTop: 8,
+    gap: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 10,
   },
-  loginButtonText: {
-    fontSize: 17,
+  ctaPressed: {
+    transform: [{ scale: 0.99 }],
+    opacity: 0.92,
+  },
+  ctaDisabled: {
+    opacity: 0.75,
+  },
+  ctaText: {
+    color: '#000',
+    fontSize: 16,
   },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 16,
+    marginTop: 16,
+    marginBottom: 12,
   },
   dividerLine: {
     flex: 1,
     height: 1,
+    backgroundColor: 'rgba(255,255,255,0.18)',
   },
   dividerText: {
-    fontSize: 13,
-    marginHorizontal: 14,
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 12,
+    marginHorizontal: 12,
   },
-  socialContainer: {
+  socialRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 16,
+    gap: 14,
+    marginBottom: 16,
   },
   socialButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  spacer: {
-    flex: 1,
-    minHeight: 16,
+  socialPressed: {
+    opacity: 0.92,
   },
-  signupContainer: {
+  socialButtonDisabled: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.8,
+  },
+  bottomRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 8,
+    flexWrap: 'wrap',
+    gap: 6,
   },
-  signupText: {
-    fontSize: 15,
+  bottomText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 13,
   },
-  signupLink: {
-    fontSize: 15,
+  bottomLink: {
+    color: WHITE,
+    fontSize: 13,
+    textDecorationLine: 'underline',
   },
 });
