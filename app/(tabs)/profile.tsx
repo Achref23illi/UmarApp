@@ -15,7 +15,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { InfiniteFeed } from '@/components/feed/InfiniteFeed';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
-import { useAppSelector } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { logoutUser } from '@/store/slices/userSlice';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -24,6 +25,7 @@ export default function ProfileScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { colors, isDark } = useTheme();
+    const dispatch = useAppDispatch();
     const userData = useAppSelector((state) => state.user);
     const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
 
@@ -34,6 +36,11 @@ export default function ProfileScreen() {
 
     // Default cover image if none provided
     const coverImage = "https://images.unsplash.com/photo-1542831371-29b0f74f9713?q=80&w=2070&auto=format&fit=crop";
+
+    const handleSignOut = async () => {
+        await dispatch(logoutUser());
+        router.replace('/welcome');
+    };
 
     // Header Component for the Feed
     const ProfileHeader = () => (
@@ -87,6 +94,23 @@ export default function ProfileScreen() {
                          <Ionicons name="settings-outline" size={20} color={colors.text.primary} />
                     </Pressable>
                 </View>
+
+                {/* Logout Button */}
+                <Pressable 
+                    style={({ pressed }) => [
+                        styles.logoutButton,
+                        { 
+                            backgroundColor: colors.surfaceHighlight,
+                            opacity: pressed ? 0.6 : 1 
+                        }
+                    ]} 
+                    onPress={handleSignOut}
+                >
+                    <Ionicons name="log-out-outline" size={18} color="#E53935" />
+                    <Text style={[styles.logoutText, { fontFamily: fontMedium, color: '#E53935' }]}>
+                        {t('profile.signOut')}
+                    </Text>
+                </Pressable>
 
                 <View style={[styles.divider, { backgroundColor: colors.border }]} />
                 
@@ -221,5 +245,17 @@ const styles = StyleSheet.create({
     postsLabel: {
         fontSize: 18,
         marginBottom: 10,
+    },
+    logoutButton: {
+        height: 40,
+        borderRadius: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        marginBottom: 20,
+    },
+    logoutText: {
+        fontSize: 14,
     }
 });

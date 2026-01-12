@@ -1,107 +1,82 @@
 /**
- * Quran Reader Screen
+ * French Quran Reader
  * ====================
- * Book-like reading experience for Quran
+ * Displays French translation of the Quran verses
  */
 
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
-import { getSurah, QURAN_EDITIONS, SURAH_NAMES, SurahContent } from '@/services/quranLibrary';
-import { saveReadingProgress, logReadingActivity, updateReadingStreak } from '@/services/quranProgress';
+import { SURAHS } from '@/services/quranData';
+import { FrenchSurah, getFrenchSurah } from '@/services/quranFrench';
+import { saveReadingProgress } from '@/services/quranProgress';
 import { useAppSelector } from '@/store/hooks';
 
-export default function QuranReaderScreen() {
+export default function FrenchReaderScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { colors, isDark } = useTheme();
-  const { editionId, surahNumber, surahName } = useLocalSearchParams<{ 
-    editionId: string; 
-    surahNumber: string; 
-    surahName: string;
+  const { colors } = useTheme();
+  const { chapterId, chapterName } = useLocalSearchParams<{
+    chapterId: string;
+    chapterName?: string;
   }>();
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
-  const scrollViewRef = useRef<ScrollView>(null);
-
-  // Tracking refs
-  const startTimeRef = useRef<number>(Date.now());
-  const ayahsReadRef = useRef<number>(0);
 
   const fontRegular = getFont(currentLanguage, 'regular');
   const fontMedium = getFont(currentLanguage, 'medium');
   const fontSemiBold = getFont(currentLanguage, 'semiBold');
   const fontBold = getFont(currentLanguage, 'bold');
 
-  const [surahData, setSurahData] = useState<SurahContent | null>(null);
+  const [surahData, setSurahData] = useState<FrenchSurah | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [fontSize, setFontSize] = useState(24);
+  const [fontSize, setFontSize] = useState(18);
   const [currentVerse, setCurrentVerse] = useState(1);
 
-  const edition = QURAN_EDITIONS.find(e => e.id === editionId);
-  const isArabic = edition?.languageCode === 'ar';
-  const surahNum = parseInt(surahNumber || '1');
-  const surahMeta = SURAH_NAMES[surahNum - 1];
+  const surahNumber = parseInt(chapterId || '1');
+  const surahMeta = SURAHS.find(s => s.number === surahNumber);
 
   useEffect(() => {
-    // Start tracking when screen mounts (or surah changes)
-    startTimeRef.current = Date.now();
-    ayahsReadRef.current = 0;
-
-    if (editionId && surahNumber) {
-      loadSurah();
-    }
-
-    // Cleanup: Save progress when leaving the screen or changing surah
-    return () => {
-      const durationSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
-      if (durationSeconds > 5 || ayahsReadRef.current > 0) {
-        logReadingActivity(ayahsReadRef.current, durationSeconds);
-        // Also update streak if significant reading occurred
-        if (durationSeconds > 60) {
-          updateReadingStreak();
-        }
-      }
-    };
-  }, [editionId, surahNumber]);
+    loadSurah();
+  }, [chapterId]);
 
   const loadSurah = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const data = await getSurah(editionId!, surahNum);
+      const data = await getFrenchSurah(surahNumber);
       if (data) {
         setSurahData(data);
         
         // Save progress
         await saveReadingProgress({
-          surahNumber: surahNum,
-          surahName: surahMeta?.arabicName || '',
-          surahEnglishName: surahMeta?.englishName || '',
+          surahNumber: surahNumber,
+          surahName: surahMeta?.name || '',
+          surahEnglishName: surahMeta?.transliteration || '',
           ayahNumber: 1,
           juz: 1,
           page: 1,
-          totalAyahsInSurah: surahMeta?.numberOfAyahs || 0,
+          totalAyahsInSurah: surahMeta?.verses || 0,
           lastReadAt: new Date().toISOString(),
         });
       }
     } catch (err) {
-      console.error('Error loading surah:', err);
-      setError('Failed to load surah. Please check your internet connection.');
+      console.error('Error loading French surah:', err);
+      setError('Échec du chargement de la sourate. Veuillez vérifier votre connexion Internet.');
     } finally {
       setLoading(false);
     }
@@ -109,31 +84,29 @@ export default function QuranReaderScreen() {
 
   const handleVersePress = async (verseNumber: number) => {
     setCurrentVerse(verseNumber);
-    ayahsReadRef.current += 1;
     
     await saveReadingProgress({
-      surahNumber: surahNum,
-      surahName: surahMeta?.arabicName || '',
-      surahEnglishName: surahMeta?.englishName || '',
+      surahNumber: surahNumber,
+      surahName: surahMeta?.name || '',
+      surahEnglishName: surahMeta?.transliteration || '',
       ayahNumber: verseNumber,
       juz: 1,
       page: 1,
-      totalAyahsInSurah: surahMeta?.numberOfAyahs || 0,
+      totalAyahsInSurah: surahMeta?.verses || 0,
       lastReadAt: new Date().toISOString(),
     });
   };
 
   const navigateSurah = (direction: 'prev' | 'next') => {
-    const newSurah = direction === 'next' ? surahNum + 1 : surahNum - 1;
+    const newSurah = direction === 'next' ? surahNumber + 1 : surahNumber - 1;
     
     if (newSurah >= 1 && newSurah <= 114) {
-      const newMeta = SURAH_NAMES[newSurah - 1];
+      const newMeta = SURAHS.find(s => s.number === newSurah);
       router.setParams({ 
-        surahNumber: newSurah.toString(),
-        surahName: isArabic ? newMeta.arabicName : newMeta.englishName
+        chapterId: newSurah.toString(),
+        chapterName: newMeta?.transliteration
       });
       setCurrentVerse(1);
-      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     }
   };
 
@@ -142,7 +115,7 @@ export default function QuranReaderScreen() {
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={[styles.loadingText, { fontFamily: fontMedium, color: colors.text.secondary }]}>
-          Loading Surah...
+          Chargement de la sourate...
         </Text>
       </View>
     );
@@ -159,7 +132,7 @@ export default function QuranReaderScreen() {
           style={[styles.retryButton, { backgroundColor: colors.primary }]}
           onPress={loadSurah}
         >
-          <Text style={[styles.retryText, { fontFamily: fontSemiBold }]}>Try Again</Text>
+          <Text style={[styles.retryText, { fontFamily: fontSemiBold }]}>Réessayer</Text>
         </Pressable>
       </View>
     );
@@ -176,10 +149,10 @@ export default function QuranReaderScreen() {
           
           <View style={styles.headerCenter}>
             <Text style={[styles.surahTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
-              {surahName || 'Surah'}
+              {chapterName || surahMeta?.transliteration}
             </Text>
             <Text style={[styles.surahInfo, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-              {surahMeta?.numberOfAyahs} Ayahs • {edition?.language}
+              {surahMeta?.verses} Versets • Traduction Française
             </Text>
           </View>
           
@@ -191,7 +164,7 @@ export default function QuranReaderScreen() {
         {/* Font Size Controls */}
         <View style={styles.controls}>
           <Pressable 
-            onPress={() => setFontSize(Math.max(18, fontSize - 2))}
+            onPress={() => setFontSize(Math.max(14, fontSize - 2))}
             style={[styles.controlButton, { backgroundColor: colors.surfaceHighlight }]}
           >
             <Text style={[styles.controlText, { color: colors.text.primary }]}>A-</Text>
@@ -200,7 +173,7 @@ export default function QuranReaderScreen() {
             {fontSize}
           </Text>
           <Pressable 
-            onPress={() => setFontSize(Math.min(36, fontSize + 2))}
+            onPress={() => setFontSize(Math.min(24, fontSize + 2))}
             style={[styles.controlButton, { backgroundColor: colors.surfaceHighlight }]}
           >
             <Text style={[styles.controlText, { color: colors.text.primary }]}>A+</Text>
@@ -209,40 +182,39 @@ export default function QuranReaderScreen() {
       </View>
 
       {/* Bismillah */}
-      {surahNum !== 9 && surahNum !== 1 && (
+      {surahNumber !== 9 && surahNumber !== 1 && (
         <View style={[styles.bismillah, { backgroundColor: colors.surface }]}>
           <Text style={[styles.bismillahText, { color: colors.primary }]}>
-            بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+            Au nom d'Allah, le Tout Miséricordieux, le Très Miséricordieux
           </Text>
         </View>
       )}
 
       {/* Verses */}
       <ScrollView 
-        ref={scrollViewRef}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Surah Header Card */}
         <View style={[styles.surahHeader, { backgroundColor: colors.primary + '10' }]}>
           <Text style={[styles.surahHeaderArabic, { color: colors.primary }]}>
-            {surahMeta?.arabicName}
+            {surahMeta?.name}
           </Text>
           <Text style={[styles.surahHeaderEnglish, { fontFamily: fontMedium, color: colors.text.primary }]}>
-            {surahMeta?.englishName} - {surahMeta?.englishTranslation}
+            {surahMeta?.transliteration} - {surahMeta?.translation}
           </Text>
           <Text style={[styles.surahHeaderMeta, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-            {surahMeta?.revelationType} • {surahMeta?.numberOfAyahs} Verses
+            {surahMeta?.revelation === 'Meccan' ? 'Mecquoise' : 'Médinoise'} • {surahMeta?.verses} Versets
           </Text>
         </View>
 
         {/* Verses */}
         {surahData?.verses.map((verse, index) => {
-          const isCurrentVerse = verse.number === currentVerse;
+          const isCurrentVerse = verse.ayah === currentVerse;
           
           return (
             <Animated.View 
-              key={verse.number}
+              key={verse.id}
               entering={FadeIn.delay(Math.min(index, 10) * 20).duration(300)}
             >
               <Pressable
@@ -253,12 +225,12 @@ export default function QuranReaderScreen() {
                     borderLeftColor: isCurrentVerse ? colors.primary : 'transparent',
                   }
                 ]}
-                onPress={() => handleVersePress(verse.number)}
+                onPress={() => handleVersePress(verse.ayah)}
               >
                 {/* Verse Number */}
                 <View style={[styles.verseNumber, { backgroundColor: colors.primary + '15' }]}>
                   <Text style={[styles.verseNumberText, { fontFamily: fontMedium, color: colors.primary }]}>
-                    {verse.number}
+                    {verse.ayah}
                   </Text>
                 </View>
                 
@@ -268,9 +240,9 @@ export default function QuranReaderScreen() {
                     styles.verseText, 
                     { 
                       fontSize, 
+                      fontFamily: fontRegular,
                       color: colors.text.primary,
-                      textAlign: isArabic ? 'right' : 'left',
-                      lineHeight: isArabic ? fontSize * 2.2 : fontSize * 1.8,
+                      lineHeight: fontSize * 1.8,
                     }
                   ]}
                 >
@@ -286,27 +258,27 @@ export default function QuranReaderScreen() {
           <Pressable
             style={[
               styles.navButton,
-              { backgroundColor: colors.surface, opacity: surahNum <= 1 ? 0.5 : 1 }
+              { backgroundColor: colors.surface, opacity: surahNumber <= 1 ? 0.5 : 1 }
             ]}
             onPress={() => navigateSurah('prev')}
-            disabled={surahNum <= 1}
+            disabled={surahNumber <= 1}
           >
             <Ionicons name="chevron-back" size={20} color={colors.text.primary} />
             <Text style={[styles.navButtonText, { fontFamily: fontMedium, color: colors.text.primary }]}>
-              Previous
+              Précédente
             </Text>
           </Pressable>
           
           <Pressable
             style={[
               styles.navButton,
-              { backgroundColor: colors.surface, opacity: surahNum >= 114 ? 0.5 : 1 }
+              { backgroundColor: colors.surface, opacity: surahNumber >= 114 ? 0.5 : 1 }
             ]}
             onPress={() => navigateSurah('next')}
-            disabled={surahNum >= 114}
+            disabled={surahNumber >= 114}
           >
             <Text style={[styles.navButtonText, { fontFamily: fontMedium, color: colors.text.primary }]}>
-              Next
+              Suivante
             </Text>
             <Ionicons name="chevron-forward" size={20} color={colors.text.primary} />
           </Pressable>
@@ -401,10 +373,11 @@ const styles = StyleSheet.create({
     marginTop: 16,
     borderRadius: 16,
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
   bismillahText: {
-    fontSize: 28,
-    fontFamily: 'System',
+    fontSize: 16,
+    textAlign: 'center',
   },
   scrollContent: {
     paddingHorizontal: 20,
@@ -449,7 +422,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   verseText: {
-    fontFamily: 'System',
     paddingRight: 40,
   },
   navigation: {

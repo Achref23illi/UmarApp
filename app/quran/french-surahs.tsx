@@ -1,7 +1,7 @@
 /**
- * Arabic Surahs List
+ * French Surahs List
  * ==================
- * List of all 114 Surahs for the Arabic Mushaf
+ * List of all 114 Surahs with French translation
  */
 
 import { Ionicons } from '@expo/vector-icons';
@@ -24,7 +24,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { SURAHS, SurahInfo } from '@/services/quranData';
 import { useAppSelector } from '@/store/hooks';
 
-export default function ArabicSurahsScreen() {
+export default function FrenchSurahsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -49,10 +49,10 @@ export default function ArabicSurahsScreen() {
 
   const handleSurahPress = (surah: SurahInfo) => {
     router.push({
-      pathname: '/quran/mushaf',
+      pathname: '/quran/french-reader',
       params: {
         chapterId: surah.number.toString(),
-        chapterName: surah.name,
+        chapterName: surah.transliteration,
       }
     });
   };
@@ -71,8 +71,8 @@ export default function ArabicSurahsScreen() {
           onPress={() => handleSurahPress(item)}
         >
           {/* Number Badge */}
-          <View style={[styles.numberBadge, { backgroundColor: colors.primary + '15' }]}>
-            <Text style={[styles.numberText, { fontFamily: fontBold, color: colors.primary }]}>
+          <View style={[styles.numberBadge, { backgroundColor: '#3B82F615' }]}>
+            <Text style={[styles.numberText, { fontFamily: fontBold, color: '#3B82F6' }]}>
               {item.number}
             </Text>
           </View>
@@ -83,7 +83,7 @@ export default function ArabicSurahsScreen() {
               {item.transliteration}
             </Text>
             <Text style={[styles.surahMeta, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-              {item.translation} • {item.verses} Verses
+              {item.translation} • {item.verses} Versets
             </Text>
           </View>
 
@@ -103,7 +103,7 @@ export default function ArabicSurahsScreen() {
                   color: item.revelation === 'Meccan' ? '#F59E0B' : '#3B82F6'
                 }
               ]}>
-                {item.revelation}
+                {item.revelation === 'Meccan' ? 'Mecquoise' : 'Médinoise'}
               </Text>
             </View>
           </View>
@@ -122,10 +122,10 @@ export default function ArabicSurahsScreen() {
           </Pressable>
           <View style={styles.headerCenter}>
             <Text style={[styles.headerTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
-              المصحف
+              Traduction Française
             </Text>
             <Text style={[styles.headerSubtitle, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-              Arabic Mushaf - 114 Surahs
+              114 Sourates
             </Text>
           </View>
           <View style={styles.backButton} />
@@ -136,7 +136,7 @@ export default function ArabicSurahsScreen() {
           <Ionicons name="search" size={20} color={colors.text.secondary} />
           <TextInput
             style={[styles.searchInput, { fontFamily: fontRegular, color: colors.text.primary }]}
-            placeholder="Search surah..."
+            placeholder="Rechercher une sourate..."
             placeholderTextColor={colors.input.placeholder}
             value={searchQuery}
             onChangeText={setSearchQuery}

@@ -1,32 +1,64 @@
 /**
  * Quran Library Screen
- * ======================
- * Library-style display with book covers for each edition
+ * ====================
+ * Library-style selection between Arabic Mushaf and French Translation
  */
 
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
-import { QURAN_EDITIONS, QuranEdition } from '@/services/quranLibrary';
 import { useAppSelector } from '@/store/hooks';
+
+interface QuranEdition {
+  id: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  icon: string;
+  color: string;
+  route: string;
+}
+
+const QURAN_EDITIONS: QuranEdition[] = [
+  {
+    id: 'mushaf',
+    title: 'المصحف',
+    subtitle: 'Arabic Mushaf',
+    description: 'Traditional Quran pages with authentic Hafs script',
+    icon: 'book',
+    color: '#10B981',
+    route: '/quran/surahs',
+  },
+  {
+    id: 'french',
+    title: 'Traduction Française',
+    subtitle: 'French Translation',
+    description: 'Complete French translation of the Holy Quran',
+    icon: 'language',
+    color: '#3B82F6',
+    route: '/quran/french-surahs',
+  },
+];
 
 export default function QuranLibraryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
+  const { t } = useTranslation();
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
 
   const fontRegular = getFont(currentLanguage, 'regular');
@@ -35,15 +67,10 @@ export default function QuranLibraryScreen() {
   const fontBold = getFont(currentLanguage, 'bold');
 
   const handleEditionPress = (edition: QuranEdition) => {
-    router.push({
-      pathname: '/quran/surahs',
-      params: { editionId: edition.id, editionName: edition.name }
-    });
+    router.push(edition.route as any);
   };
 
-  const renderBookCover = (edition: QuranEdition, index: number) => {
-    const isArabic = edition.languageCode === 'ar';
-    
+  const renderEditionCard = (edition: QuranEdition, index: number) => {
     return (
       <Animated.View 
         key={edition.id}
@@ -51,66 +78,40 @@ export default function QuranLibraryScreen() {
       >
         <Pressable
           style={({ pressed }) => [
-            styles.bookContainer,
+            styles.editionCard,
             { opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] }
           ]}
           onPress={() => handleEditionPress(edition)}
         >
-          {/* Book Cover */}
           <LinearGradient
-            colors={[edition.coverColor, darkenColor(edition.coverColor, 30)]}
+            colors={[edition.color, darkenColor(edition.color, 20)]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.bookCover}
+            style={styles.editionGradient}
           >
-            {/* Spine Effect */}
-            <View style={styles.bookSpine}>
-              <LinearGradient
-                colors={['rgba(255,255,255,0.15)', 'rgba(0,0,0,0.1)']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.spineGradient}
-              />
+            {/* Icon */}
+            <View style={styles.editionIconContainer}>
+              <Ionicons name={edition.icon as any} size={48} color="#FFF" />
             </View>
             
-            {/* Decorative Pattern */}
-            <View style={styles.decorativePattern}>
-              <View style={[styles.patternLine, { width: '60%' }]} />
-              <View style={[styles.patternDot]} />
-              <View style={[styles.patternLine, { width: '40%' }]} />
-            </View>
-            
-            {/* Book Content */}
-            <View style={styles.bookContent}>
-              <Text style={[styles.bookIcon]}>{edition.icon}</Text>
-              <Text 
-                style={[
-                  styles.bookTitle, 
-                  { fontFamily: isArabic ? undefined : fontBold }
-                ]}
-              >
-                {edition.name}
+            {/* Content */}
+            <View style={styles.editionContent}>
+              <Text style={[styles.editionTitle, { fontFamily: fontBold }]}>
+                {edition.title}
               </Text>
-              <Text style={[styles.bookLanguage, { fontFamily: fontMedium }]}>
-                {edition.language}
+              <Text style={[styles.editionSubtitle, { fontFamily: fontMedium }]}>
+                {edition.subtitle}
+              </Text>
+              <Text style={[styles.editionDescription, { fontFamily: fontRegular }]}>
+                {edition.description}
               </Text>
             </View>
             
-            {/* Bottom Decoration */}
-            <View style={styles.bottomDecoration}>
-              <View style={[styles.patternLine, { width: '30%' }]} />
-              <View style={[styles.patternDot, { width: 6, height: 6 }]} />
-              <View style={[styles.patternLine, { width: '30%' }]} />
+            {/* Arrow */}
+            <View style={styles.editionArrow}>
+              <Ionicons name="chevron-forward" size={24} color="rgba(255,255,255,0.8)" />
             </View>
-            
-            {/* Author */}
-            <Text style={[styles.bookAuthor, { fontFamily: fontRegular }]}>
-              {edition.author}
-            </Text>
           </LinearGradient>
-          
-          {/* Book Shadow */}
-          <View style={[styles.bookShadow, { backgroundColor: edition.coverColor }]} />
         </Pressable>
       </Animated.View>
     );
@@ -124,7 +125,7 @@ export default function QuranLibraryScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </Pressable>
         <Text style={[styles.headerTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
-          Quran Library
+          {t('common.quran') || 'Quran Library'}
         </Text>
         <View style={styles.backButton} />
       </View>
@@ -139,23 +140,23 @@ export default function QuranLibraryScreen() {
             📚 Choose Your Edition
           </Text>
           <Text style={[styles.sectionSubtitle, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-            Select a Quran edition in your preferred language
+            Select how you'd like to read the Holy Quran
           </Text>
         </Animated.View>
 
-        {/* Book Shelf */}
-        <View style={styles.bookShelf}>
-          {QURAN_EDITIONS.map((edition, index) => renderBookCover(edition, index))}
+        {/* Edition Cards */}
+        <View style={styles.editionsContainer}>
+          {QURAN_EDITIONS.map((edition, index) => renderEditionCard(edition, index))}
         </View>
 
         {/* Info Card */}
         <Animated.View 
-          entering={FadeInUp.delay(800)}
+          entering={FadeInUp.delay(600)}
           style={[styles.infoCard, { backgroundColor: colors.surface }]}
         >
           <Ionicons name="information-circle" size={24} color={colors.primary} />
           <Text style={[styles.infoText, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-            Each edition contains all 114 Surahs of the Holy Quran. Your reading progress is saved automatically.
+            Both editions contain all 114 Surahs of the Holy Quran. Your reading progress is saved automatically.
           </Text>
         </Animated.View>
       </ScrollView>
@@ -211,92 +212,49 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 30,
   },
-  bookShelf: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 20,
+  editionsContainer: {
+    gap: 16,
     marginBottom: 30,
   },
-  bookContainer: {
+  editionCard: {
     width: '100%',
-    marginBottom: 10,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  bookCover: {
-    height: 200,
-    borderRadius: 12,
+  editionGradient: {
     padding: 20,
-    overflow: 'hidden',
-    position: 'relative',
+    minHeight: 140,
   },
-  bookSpine: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 20,
-    overflow: 'hidden',
+  editionIconContainer: {
+    marginBottom: 12,
   },
-  spineGradient: {
+  editionContent: {
     flex: 1,
   },
-  decorativePattern: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 20,
-  },
-  patternLine: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-  },
-  patternDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.4)',
-  },
-  bookContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bookIcon: {
-    fontSize: 36,
-    marginBottom: 8,
-  },
-  bookTitle: {
+  editionTitle: {
     fontSize: 24,
     color: '#FFFFFF',
-    textAlign: 'center',
     marginBottom: 4,
   },
-  bookLanguage: {
+  editionSubtitle: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.9)',
+    marginBottom: 8,
   },
-  bottomDecoration: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 20,
+  editionDescription: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+    lineHeight: 18,
   },
-  bookAuthor: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.5)',
-    textAlign: 'center',
-    marginTop: 10,
-  },
-  bookShadow: {
+  editionArrow: {
     position: 'absolute',
-    bottom: -5,
-    left: 10,
-    right: 10,
-    height: 10,
-    borderRadius: 6,
-    opacity: 0.3,
+    right: 20,
+    top: 20,
   },
   infoCard: {
     flexDirection: 'row',

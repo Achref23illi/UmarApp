@@ -338,8 +338,6 @@
     "share": "Partager",
     "addedToAgenda": "Ajouté à l'agenda",
     "removedFromAgenda": "Retiré de l'agenda",
-    "pinned": "Épinglé en haut",
-    "unpinned": "Désépinglé",
     "commentsReviewedByAdmin": "Les commentaires sont vérifiés par l'admin.",
     "locationNotAvailable": "Localisation non disponible",
     "createPost": "Créer un Post",
@@ -383,7 +381,13 @@
     "meritSource": "(Rapporté par Mouslim dans son Sahih n°945)",
     "meritFootnote": "(*) C'est à dire de récompense",
     "pinned": "Publication épinglée",
-    "unpinned": "Publication désépinglée"
+    "unpinned": "Publication désépinglée",
+    "burialLocation": "Lieu d'inhumation",
+    "cemetery": "Cimetière",
+    "cemeteryName": "Nom du Cimetière",
+    "cemeteryNamePlaceholder": "ex. Cimetière Musulman",
+    "cemeteryAddress": "Adresse du Cimetière",
+    "cemeteryAddressPlaceholder": "Adresse ou code postal"
   },
   "time": {
     "justNow": "À l'instant",
@@ -412,7 +416,7 @@
     "mosquesAdded": "Mosquées ajoutées",
     "curatedLocations": "lieux sélectionnés",
     "mosqueName": "Nom de la mosquée",
-    "mosqueNamePlaceholder": "ex. Masjid Al-Noor",
+    "mosqueNamePlaceholder": "ex. Grande Mosquée de Paris",
     "locationLabel": "Emplacement",
     "selectOnMap": "Sélectionner sur la carte",
     "addressOptional": "Adresse (Optionnel)",

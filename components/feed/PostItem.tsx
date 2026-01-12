@@ -122,6 +122,8 @@ export function PostItem({ post }: PostItemProps) {
   };
 
   const isEvent = post.type === 'event';
+  // Check if post is from admin (admin user ID: 09cf649d-431c-4d63-9f26-7ad953b83bf3)
+  const isAdminPost = post.user.id === '09cf649d-431c-4d63-9f26-7ad953b83bf3';
   const tags = post.tags && post.tags.length ? post.tags : [];
   
   return (
@@ -136,19 +138,19 @@ export function PostItem({ post }: PostItemProps) {
       {/* Header */}
       <View style={styles.header}>
         <Image 
-          source={isEvent ? require('@/assets/images/logo.png') : { uri: post.user.avatar }} 
-          style={[styles.avatar, isEvent && styles.eventAvatar]}
+          source={(isEvent || isAdminPost) ? require('@/assets/images/logo.png') : { uri: post.user.avatar }} 
+          style={[styles.avatar, (isEvent || isAdminPost) && styles.eventAvatar]}
           contentFit="cover"
         />
         <View style={styles.headerText}>
           <View style={styles.nameRow}>
             <Text style={[styles.name, { fontFamily: fontBold, color: colors.text.primary }]}>
-              {isEvent ? 'UmarApp' : post.user.name}
+              {(isEvent || isAdminPost) ? 'UmarApp' : post.user.name}
             </Text>
-            {(post.user.isVerified || isEvent) && (
+            {(post.user.isVerified || isEvent || isAdminPost) && (
               <Ionicons name="checkmark-circle" size={14} color={colors.primary} style={styles.verifiedIcon} />
             )}
-            {isEvent && (
+            {(isEvent || isAdminPost) && (
                 <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
                     <Text style={[styles.badgeText, { color: colors.primary, fontFamily: fontMedium }]}>{t('feed.official')}</Text>
                 </View>

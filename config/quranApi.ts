@@ -31,6 +31,3 @@ const ENV_CONFIG: Record<'pre-production' | 'production', ApiConfig> = {
 };
 
 export const QURAN_API_CONFIG = ENV_CONFIG[CURRENT_ENV];
-
-// Images Base URL (Standard Quran.com CDN)
-export const QURAN_IMAGE_BASE_URL = 'https://verses.quran.com/quran-images/v1';

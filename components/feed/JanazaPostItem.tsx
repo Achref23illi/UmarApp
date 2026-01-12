@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Linking from 'expo-linking';
@@ -6,8 +6,8 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
 
+import { toast } from '@/components/ui/Toast';
 import { Images } from '@/config/assets';
 import { Colors } from '@/config/colors';
 import { getFont } from '@/hooks/use-fonts';
@@ -15,7 +15,6 @@ import { useTheme } from '@/hooks/use-theme';
 import { Post, socialService } from '@/services/socialService';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setInAgenda, setPinned as setPinnedAction } from '@/store/slices/agendaSlice';
-import { toast } from '@/components/ui/Toast';
 
 interface JanazaPostItemProps {
   post: Post;
@@ -229,7 +228,7 @@ export function JanazaPostItem({ post, onDelete }: JanazaPostItemProps) {
                 <>
                 <View style={styles.divider} />
                 <View style={styles.infoRow}>
-                    <Ionicons name="construct-outline" size={20} color={colors.text.secondary} style={styles.infoIcon} />
+                    <MaterialCommunityIcons name="shovel" size={20} color={colors.text.secondary} style={styles.infoIcon} />
                     <View style={styles.infoTextContainer}>
                         <Text style={[styles.infoValue, { fontFamily: fontMedium, color: colors.text.primary }]}>
                             {isRepatriation ? t('feed.repatriation') : `${cemeteryName}${cemeteryAddress ? ` ${cemeteryAddress}` : ''}`}
@@ -484,6 +483,25 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  bannerIcon: {
+    width: 24,
+    height: 24,
+    marginRight: 8,
+    tintColor: '#FFFFFF',
+  },
+  tagNearName: {
+    fontSize: 12,
+    marginLeft: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  timeNearName: {
+    fontSize: 12,
+    marginTop: 2,
   },
   footer: {
     flexDirection: 'row',
