@@ -5,8 +5,11 @@
  * Includes a modern header with search and prayer time banner.
  */
 
+import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import * as Location from 'expo-location';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Pressable,
@@ -20,8 +23,8 @@ import { InfiniteFeed } from '@/components/feed/InfiniteFeed';
 import { PrayerBanner } from '@/components/prayer/PrayerBanner';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
-import { useAppSelector } from '@/store/hooks';
 import { getReadingProgress, ReadingProgress } from '@/services/quranProgress';
+import { useAppSelector } from '@/store/hooks';
 
 export default function HomeScreen() {
   const { t } = useTranslation();
@@ -70,13 +73,16 @@ export default function HomeScreen() {
   );
 
   const handleContinueReading = () => {
-    if (readingProgress?.page) {
+    if (readingProgress?.surahNumber) {
       router.push({
         pathname: '/quran/mushaf',
-        params: { initialPage: readingProgress.page.toString() }
+        params: { 
+          chapterId: readingProgress.surahNumber.toString(),
+          chapterName: readingProgress.surahName
+        }
       });
     } else {
-      router.push('/quran/mushaf');
+      router.push('/quran');
     }
   };
 
@@ -132,10 +138,10 @@ export default function HomeScreen() {
           </View>
           <View style={styles.quranTextContainer}>
             <Text style={[styles.quranTitle, { fontFamily: fontSemiBold, color: colors.text.primary }]}>
-              Continue Reading Quran
+              {readingProgress ? t('quran.continueReading') : t('quran.readQuran')}
             </Text>
             <Text style={[styles.quranSubtitle, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-              {readingProgress ? `Page ${readingProgress.page}` : 'Start reading'}
+              {readingProgress ? `${t('quran.page')} ${readingProgress.page}` : t('quran.startReading')}
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />

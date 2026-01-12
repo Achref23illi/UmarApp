@@ -24,22 +24,26 @@ export async function getReadingProgress(): Promise<ReadingProgress | null> {
   try {
     const data = await AsyncStorage.getItem(STORAGE_KEY);
     if (data) {
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      // Filter out incomplete/placeholder progress
+      if (parsed.surahNumber === 0) {
+        return null;
+      }
+      return parsed;
     }
-    // Return default starting position
-    return {
-      surahNumber: 1,
-      surahName: 'الفاتحة',
-      surahEnglishName: 'Al-Fatiha',
-      ayahNumber: 1,
-      juz: 1,
-      page: 1,
-      totalAyahsInSurah: 7,
-      lastReadAt: new Date().toISOString(),
-    };
+    return null;
   } catch (error) {
     console.error('Error getting reading progress:', error);
     return null;
+  }
+}
+
+// Reset reading progress
+export async function resetReadingProgress(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEY);
+  } catch (error) {
+    console.error('Error resetting reading progress:', error);
   }
 }
 

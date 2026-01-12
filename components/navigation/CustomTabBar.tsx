@@ -45,6 +45,12 @@ export function CustomTabBar({ state, navigation }: CustomTabBarProps) {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
 
+  // Hide tab bar on salat screen
+  const currentRoute = state.routes[state.index];
+  if (currentRoute?.name === 'salat') {
+    return null;
+  }
+
   const handleTabPress = (routeName: string) => {
     // Find route index in state
     const tabIndex = state.routes.findIndex(r => r.name === routeName);

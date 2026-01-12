@@ -59,6 +59,9 @@ export default function CreatePostScreen() {
   const [deceasedName, setDeceasedName] = useState('');
   const [deceasedGender, setDeceasedGender] = useState<'male' | 'female'>('male');
   const [mosqueName, setMosqueName] = useState('');
+  const [cemeteryName, setCemeteryName] = useState('');
+  const [cemeteryAddress, setCemeteryAddress] = useState('');
+  const [isRepatriation, setIsRepatriation] = useState(false);
   
   // Sick Visit Fields
   const [patientName, setPatientName] = useState('');
@@ -242,7 +245,10 @@ export default function CreatePostScreen() {
             deceasedGender,
             mosqueName,
             prayerTime: prayerTime || 'After Prayer',
-            location: selectedLocation 
+            mosqueLocation: selectedLocation,
+            cemeteryName: isRepatriation ? undefined : cemeteryName || undefined,
+            cemeteryAddress: isRepatriation ? undefined : cemeteryAddress || undefined,
+            isRepatriation,
           };
       } else if (isSickVisit) {
           metadata = {
@@ -415,6 +421,52 @@ export default function CreatePostScreen() {
                             onChangeText={setPrayerTime}
                         />
                     </View>
+
+                    {/* Cemetery / Repatriation Section */}
+                    <View style={styles.field}>
+                       <Text style={[styles.label, { fontFamily: fontMedium, color: colors.text.secondary }]}>{t('feed.burialLocation')}</Text>
+                       <View style={styles.genderRow}>
+                           <Pressable 
+                              onPress={() => setIsRepatriation(false)}
+                              style={[styles.genderOption, !isRepatriation && styles.genderOptionSelected, { borderColor: !isRepatriation ? colors.primary : colors.input.border, backgroundColor: !isRepatriation ? 'rgba(139, 92, 246, 0.1)' : 'transparent' }]}
+                           >
+                              <Text style={[styles.genderText, { color: !isRepatriation ? colors.primary : colors.text.secondary, fontFamily: fontMedium }]}>{t('feed.cemetery')}</Text>
+                           </Pressable>
+                           <Pressable 
+                              onPress={() => setIsRepatriation(true)}
+                              style={[styles.genderOption, isRepatriation && styles.genderOptionSelected, { borderColor: isRepatriation ? colors.primary : colors.input.border, backgroundColor: isRepatriation ? 'rgba(139, 92, 246, 0.1)' : 'transparent' }]}
+                           >
+                              <Text style={[styles.genderText, { color: isRepatriation ? colors.primary : colors.text.secondary, fontFamily: fontMedium }]}>{t('feed.repatriation')}</Text>
+                           </Pressable>
+                       </View>
+                    </View>
+
+                    {/* Cemetery Details (only show if not repatriation) */}
+                    {!isRepatriation && (
+                        <>
+                            <View style={styles.field}>
+                                <Text style={[styles.label, { fontFamily: fontMedium, color: colors.text.secondary }]}>{t('feed.cemeteryName')}</Text>
+                                <TextInput
+                                    style={[styles.fieldInput, { backgroundColor: colors.input.background, color: colors.text.primary, borderColor: colors.input.border }]}
+                                    placeholder={t('feed.cemeteryNamePlaceholder')}
+                                    placeholderTextColor={colors.input.placeholder}
+                                    value={cemeteryName}
+                                    onChangeText={setCemeteryName}
+                                />
+                            </View>
+
+                            <View style={styles.field}>
+                                <Text style={[styles.label, { fontFamily: fontMedium, color: colors.text.secondary }]}>{t('feed.cemeteryAddress')}</Text>
+                                <TextInput
+                                    style={[styles.fieldInput, { backgroundColor: colors.input.background, color: colors.text.primary, borderColor: colors.input.border }]}
+                                    placeholder={t('feed.cemeteryAddressPlaceholder')}
+                                    placeholderTextColor={colors.input.placeholder}
+                                    value={cemeteryAddress}
+                                    onChangeText={setCemeteryAddress}
+                                />
+                            </View>
+                        </>
+                    )}
                 </Animated.View>
             )}
 

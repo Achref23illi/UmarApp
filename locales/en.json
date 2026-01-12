@@ -338,8 +338,6 @@
     "share": "Share",
     "addedToAgenda": "Added to agenda",
     "removedFromAgenda": "Removed from agenda",
-    "pinned": "Pinned to top",
-    "unpinned": "Unpinned",
     "commentsReviewedByAdmin": "Comments are reviewed by admin.",
     "locationNotAvailable": "Location not available",
     "createPost": "Create Post",
@@ -383,7 +381,13 @@
     "meritSource": "(Reported by Muslim in his Sahih no. 945)",
     "meritFootnote": "(*) That is to say, of reward",
     "pinned": "Post pinned",
-    "unpinned": "Post unpinned"
+    "unpinned": "Post unpinned",
+    "burialLocation": "Burial Location",
+    "cemetery": "Cemetery",
+    "cemeteryName": "Cemetery Name",
+    "cemeteryNamePlaceholder": "e.g. Muslim Cemetery",
+    "cemeteryAddress": "Cemetery Address",
+    "cemeteryAddressPlaceholder": "Address or postal code"
   },
   "time": {
     "justNow": "Just now",
@@ -412,7 +416,7 @@
     "mosquesAdded": "Mosques Added",
     "curatedLocations": "curated locations",
     "mosqueName": "Mosque Name",
-    "mosqueNamePlaceholder": "e.g. Masjid Al-Noor",
+    "mosqueNamePlaceholder": "e.g. Grande Mosquée de Paris",
     "locationLabel": "Location",
     "selectOnMap": "Select on Map",
     "addressOptional": "Address (Optional)",
