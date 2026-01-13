@@ -5,14 +5,15 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Colors } from '@/config/colors';
 import { getFont } from '@/hooks/use-fonts';
+import { useTheme } from '@/hooks/use-theme';
 import { useAppSelector } from '@/store/hooks';
 
 interface GameSettings {
@@ -25,6 +26,9 @@ interface GameSettings {
 export default function GameSettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
+  const { colors } = useTheme();
+  
   const { theme, level } = useLocalSearchParams<{ theme?: string; level?: string }>();
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
 
@@ -40,7 +44,6 @@ export default function GameSettingsScreen() {
   });
 
   const handleStart = () => {
-    // Navigate to quiz game with settings
     router.push({
       pathname: '/quiz/game',
       params: {
@@ -61,7 +64,7 @@ export default function GameSettingsScreen() {
   const settingsList = [
     {
       id: 'responseTime',
-      label: 'Temps de réponse',
+      label: t('quiz.settings.response_time'),
       icon: 'time-outline',
       value: `${settings.responseTime} sec`,
       options: [15, 30, 45, 60],
@@ -69,7 +72,7 @@ export default function GameSettingsScreen() {
     },
     {
       id: 'numberOfQuestions',
-      label: 'Nombre de question',
+      label: t('quiz.settings.questions_count'),
       icon: 'help-circle-outline',
       value: settings.numberOfQuestions.toString(),
       options: [10, 20, 30, 40],
@@ -77,7 +80,7 @@ export default function GameSettingsScreen() {
     },
     {
       id: 'numberOfJokers',
-      label: 'Nombre de joker',
+      label: t('quiz.settings.jokers_count'),
       icon: 'happy-outline',
       value: settings.numberOfJokers.toString(),
       options: [0, 1, 2, 3],
@@ -85,8 +88,8 @@ export default function GameSettingsScreen() {
     },
     {
       id: 'numberOfHelps',
-      label: "Nombre d'aide",
-      icon: 'lifebuoy-outline',
+      label: t('quiz.settings.helps_count'),
+      icon: 'bulb-outline',
       value: settings.numberOfHelps.toString(),
       options: [0, 1, 2, 3],
       current: settings.numberOfHelps,
@@ -94,70 +97,59 @@ export default function GameSettingsScreen() {
   ];
 
   return (
-    <View style={styles.container}>
-      {/* Background Pattern */}
-      <Image
-        source={require('@/assets/images/quizz_background.png')}
-        style={styles.backgroundImage}
-        contentFit="cover"
-      />
-
-      {/* Curved Header */}
-      <View style={styles.curvedHeader}>
-        <LinearGradient
-          colors={['#7C3AED', '#A855F7']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.headerGradient}
+    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable 
+          onPress={() => router.back()} 
+          style={[styles.backButton, { backgroundColor: colors.surface }]}
         >
-          <Ionicons name="star" size={60} color="#FCD34D" style={styles.starLeft} />
-          <Ionicons name="star" size={40} color="#FCD34D" style={styles.starRight} />
-          
-          <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-            <View style={styles.logoContainer}>
-              <Ionicons name="settings-outline" size={48} color="#FFFFFF" />
-              <Text style={[styles.logo, { fontFamily: fontBold }]}>Paramètre de jeu</Text>
-            </View>
-          </View>
-        </LinearGradient>
+          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+        </Pressable>
+        <Text style={[styles.headerTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
+            {t('quiz.settings.title')}
+        </Text>
+        <View style={{ width: 44 }} />
       </View>
 
-      {/* Content */}
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.content}>
         {/* Settings List */}
         <View style={styles.settingsList}>
           {settingsList.map((setting) => (
-            <View key={setting.id} style={styles.settingItem}>
+            <View 
+                key={setting.id} 
+                style={[styles.settingItem, { backgroundColor: colors.surface, shadowColor: colors.text.primary }]}
+            >
               <View style={styles.settingLeft}>
-                <Ionicons name={setting.icon as any} size={24} color="#374151" />
-                <Text style={[styles.settingLabel, { fontFamily: fontRegular }]}>
+                <Ionicons name={setting.icon as any} size={24} color={colors.text.secondary} />
+                <Text style={[styles.settingLabel, { fontFamily: fontRegular, color: colors.text.primary }]}>
                   {setting.label}
                 </Text>
               </View>
               <View style={styles.settingRight}>
-                <Text style={[styles.settingValue, { fontFamily: fontBold }]}>
+                <Text style={[styles.settingValue, { fontFamily: fontBold, color: Colors.palette.purple.primary }]}>
                   {setting.value}
                 </Text>
                 <View style={styles.valueButtons}>
                   <Pressable
-                    style={styles.valueButton}
+                    style={[styles.valueButton, { backgroundColor: colors.surfaceHighlight || '#F3F4F6' }]}
                     onPress={() => {
                       const currentIndex = setting.options.indexOf(setting.current);
                       const prevIndex = Math.max(0, currentIndex - 1);
                       updateSetting(setting.id as keyof GameSettings, setting.options[prevIndex]);
                     }}
                   >
-                    <Ionicons name="remove" size={20} color="#6B7280" />
+                    <Ionicons name="remove" size={20} color={colors.text.secondary} />
                   </Pressable>
                   <Pressable
-                    style={styles.valueButton}
+                    style={[styles.valueButton, { backgroundColor: colors.surfaceHighlight || '#F3F4F6' }]}
                     onPress={() => {
                       const currentIndex = setting.options.indexOf(setting.current);
                       const nextIndex = Math.min(setting.options.length - 1, currentIndex + 1);
                       updateSetting(setting.id as keyof GameSettings, setting.options[nextIndex]);
                     }}
                   >
-                    <Ionicons name="add" size={20} color="#6B7280" />
+                    <Ionicons name="add" size={20} color={colors.text.secondary} />
                   </Pressable>
                 </View>
               </View>
@@ -168,30 +160,23 @@ export default function GameSettingsScreen() {
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
           <Pressable
-            style={styles.backButton}
+            style={[styles.actionButton, styles.backActionButton, { backgroundColor: colors.surface, borderColor: colors.surfaceHighlight || '#E5E7EB' }]}
             onPress={() => router.back()}
           >
-            <Text style={[styles.backButtonText, { fontFamily: fontMedium }]}>
-              Revenir
+            <Text style={[styles.actionButtonText, { fontFamily: fontMedium, color: colors.text.secondary }]}>
+              {t('quiz.back')}
             </Text>
           </Pressable>
           <Pressable
-            style={styles.startButton}
+            style={[styles.actionButton, styles.startButton, { backgroundColor: Colors.palette.purple.primary }]}
             onPress={handleStart}
           >
-            <LinearGradient
-              colors={['#FCD34D', '#F59E0B']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.startButtonGradient}
-            >
-              <Text style={[styles.startButtonText, { fontFamily: fontMedium }]}>
-                Commencer
-              </Text>
-            </LinearGradient>
+             <Text style={[styles.actionButtonText, { fontFamily: fontMedium, color: '#FFFFFF' }]}>
+                {t('quiz.settings.start')}
+             </Text>
           </Pressable>
         </View>
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -199,78 +184,45 @@ export default function GameSettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  backgroundImage: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    opacity: 0.4,
-  },
-  curvedHeader: {
-    width: '100%',
-    height: 200,
-    borderBottomLeftRadius: 80,
-    borderBottomRightRadius: 80,
-    overflow: 'hidden',
-  },
-  headerGradient: {
-    flex: 1,
-    paddingBottom: 30,
-    position: 'relative',
-  },
-  starLeft: {
-    position: 'absolute',
-    top: 30,
-    left: 80,
-    opacity: 0.9,
-    transform: [{ rotate: '-15deg' }],
-  },
-  starRight: {
-    position: 'absolute',
-    top: 20,
-    right: 60,
-    opacity: 0.9,
-    transform: [{ rotate: '15deg' }],
   },
   header: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  logoContainer: {
-    alignItems: 'center',
-  },
-  logo: {
-    fontSize: 24,
-    color: '#FFFFFF',
-    marginTop: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+  headerTitle: {
+    fontSize: 20,
   },
   content: {
-    flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 30,
+    paddingTop: 20,
+    paddingBottom: 40,
   },
   settingsList: {
-    gap: 24,
+    gap: 16,
     marginBottom: 40,
   },
   settingItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    flexDirection: 'column',
+    gap: 16,
     paddingVertical: 20,
     paddingHorizontal: 20,
     borderRadius: 16,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
   },
@@ -278,71 +230,52 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    flex: 1,
   },
   settingLabel: {
     fontSize: 16,
-    color: '#374151',
   },
   settingRight: {
-    alignItems: 'flex-end',
-    gap: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
   },
   settingValue: {
     fontSize: 18,
-    color: '#374151',
   },
   valueButtons: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
   },
   valueButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#F3F4F6',
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionButtons: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
+    gap: 16,
   },
-  backButton: {
+  actionButton: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  backButtonText: {
-    fontSize: 16,
-    color: '#F59E0B',
+  backActionButton: {
+    borderWidth: 1,
   },
   startButton: {
-    flex: 1,
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  startButtonGradient: {
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  startButtonText: {
+  actionButtonText: {
     fontSize: 16,
-    color: '#FFFFFF',
   },
 });

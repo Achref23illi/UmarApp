@@ -1,50 +1,49 @@
-/**
- * Quiz Theme Selection Screen
- * ============================
- * Users select a theme/topic for their quiz
- */
-
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInRight } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Colors } from '@/config/colors';
 import { getFont } from '@/hooks/use-fonts';
+import { useTheme } from '@/hooks/use-theme';
 import { useAppSelector } from '@/store/hooks';
 
 const themes = [
-  { id: 1, name: 'La vie du Prophète sws' },
-  { id: 2, name: "Les piliers de l'islam" },
-  { id: 3, name: 'La foi' },
-  { id: 4, name: 'Le Coran' },
-  { id: 5, name: 'Jurisprudence' },
+  { id: 1, key: 'prophet' },
+  { id: 2, key: 'pillars' },
+  { id: 3, key: 'faith' },
+  { id: 4, key: 'quran' },
+  { id: 5, key: 'fiqh' },
 ];
 
 export default function ThemeSelectionScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
+  const { colors } = useTheme();
   const { level } = useLocalSearchParams<{ level: string }>();
-  const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
 
+  const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
   const fontBold = getFont(currentLanguage, 'bold');
   const fontMedium = getFont(currentLanguage, 'medium');
   const fontRegular = getFont(currentLanguage, 'regular');
 
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
+  const [selectedThemeKey, setSelectedThemeKey] = useState<string | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
 
-  const handleThemeSelect = (themeName: string) => {
-    setSelectedTheme(themeName);
+  const handleThemeSelect = (themeKey: string) => {
+    setSelectedThemeKey(themeKey);
+    // Store the translated name for display/params if needed, or just key
+    setSelectedTheme(t(`quiz.themes.${themeKey}`)); 
     setShowConfirmation(true);
   };
 
   const handleConfirm = () => {
     setShowConfirmation(false);
-    // Navigate to game settings
     router.push({
       pathname: '/quiz/game-settings',
       params: { theme: selectedTheme || '', level: level || '' }
@@ -52,51 +51,24 @@ export default function ThemeSelectionScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Background Pattern */}
-      <Image
-        source={require('@/assets/images/quizz_background.png')}
-        style={styles.backgroundImage}
-        contentFit="cover"
-      />
-
-      {/* Curved Header */}
-      <View style={styles.curvedHeader}>
-        <LinearGradient
-          colors={['#7C3AED', '#A855F7']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.headerGradient}
+    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable 
+          onPress={() => router.back()} 
+          style={[styles.backButton, { backgroundColor: colors.surface }]}
         >
-          <Ionicons name="star" size={60} color="#FCD34D" style={styles.starLeft} />
-          <Ionicons name="star" size={40} color="#FCD34D" style={styles.starRight} />
-          
-          <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-            <View style={styles.logoContainer}>
-              <Text style={[styles.logo, { fontFamily: fontBold }]}>QUIZZ</Text>
-            </View>
-            <Pressable 
-              style={styles.settingsButton}
-              onPress={() => router.push('/settings')}
-            >
-              <Ionicons name="settings-outline" size={28} color="#FFF" />
-            </Pressable>
-          </View>
-        </LinearGradient>
+          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+        </Pressable>
       </View>
 
-      {/* Content */}
       <View style={styles.content}>
         <View style={styles.titleContainer}>
-          <Text style={[styles.title, { fontFamily: fontBold }]}>
-            Choisissez un thème :
+          <Text style={[styles.title, { fontFamily: fontBold, color: colors.text.primary }]}>
+            {t('quiz.themes.title')}
           </Text>
-          <View style={styles.emojiContainer}>
-            <Text style={styles.emoji}>😊</Text>
-          </View>
         </View>
 
-        {/* Theme List */}
         <View style={styles.themesContainer}>
           {themes.map((theme, index) => (
             <Animated.View
@@ -107,32 +79,24 @@ export default function ThemeSelectionScreen() {
                 style={({ pressed }) => [
                   styles.themeButton,
                   { 
-                    backgroundColor: '#FFFFFF',
-                    transform: [{ scale: pressed ? 0.98 : 1 }]
+                    backgroundColor: colors.surface,
+                    transform: [{ scale: pressed ? 0.98 : 1 }],
+                    shadowColor: colors.text.primary
                   }
                 ]}
-                onPress={() => handleThemeSelect(theme.name)}
+                onPress={() => handleThemeSelect(theme.key)}
               >
-                <Text style={[styles.themeText, { fontFamily: fontRegular }]}>
-                  {theme.name}
+                <Text style={[styles.themeText, { fontFamily: fontMedium, color: colors.text.primary }]}>
+                  {t(`quiz.themes.${theme.key}`)}
                 </Text>
+                <Ionicons name="chevron-forward" size={20} color={colors.text.secondary} />
               </Pressable>
             </Animated.View>
           ))}
         </View>
-
-        {/* Back Button */}
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Text style={[styles.backButtonText, { fontFamily: fontMedium }]}>
-            Revenir
-          </Text>
-        </Pressable>
       </View>
 
-      {/* Theme Confirmation Modal */}
+      {/* Confirmation Modal */}
       <Modal
         visible={showConfirmation}
         transparent
@@ -142,43 +106,38 @@ export default function ThemeSelectionScreen() {
         <View style={styles.modalOverlay}>
           <Animated.View 
             entering={FadeIn.duration(200)}
-            style={styles.modalContent}
+            style={[styles.modalContent, { backgroundColor: colors.surface }]}
           >
-            <View style={styles.modalCard}>
-              {/* Close Button */}
-              <Pressable
-                style={styles.closeButton}
-                onPress={() => setShowConfirmation(false)}
-              >
-                <Ionicons name="close" size={28} color="#374151" />
-              </Pressable>
-
-              <Text style={[styles.modalTitle, { fontFamily: fontRegular }]}>
-                VOUS AVEZ SÉLECTIONNÉ LE THÈME :
-              </Text>
-              <Text style={[styles.modalTheme, { fontFamily: fontBold }]}>
+            <View style={styles.modalHeader}>
+                 <Text style={[styles.modalTitle, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+                    {t('quiz.selected_theme_label')}
+                 </Text>
+                 <Pressable onPress={() => setShowConfirmation(false)}>
+                    <Ionicons name="close" size={24} color={colors.text.secondary} />
+                 </Pressable>
+            </View>
+            
+            <Text style={[styles.modalTheme, { fontFamily: fontBold, color: Colors.palette.purple.primary }]}>
                 {selectedTheme}
-              </Text>
+            </Text>
 
-              {/* Action Buttons */}
-              <View style={styles.modalButtons}>
+            <View style={styles.modalButtons}>
                 <Pressable
-                  style={styles.cancelButton}
+                  style={[styles.button, styles.cancelButton, { backgroundColor: colors.surfaceHighlight || '#E5E7EB' }]}
                   onPress={() => setShowConfirmation(false)}
                 >
-                  <Text style={[styles.cancelText, { fontFamily: fontMedium }]}>
-                    Revenir
+                  <Text style={[styles.buttonText, { fontFamily: fontMedium, color: colors.text.primary }]}>
+                    {t('quiz.back')}
                   </Text>
                 </Pressable>
                 <Pressable
-                  style={styles.confirmButton}
+                  style={[styles.button, styles.confirmButton, { backgroundColor: Colors.palette.purple.primary }]}
                   onPress={handleConfirm}
                 >
-                  <Text style={[styles.confirmText, { fontFamily: fontMedium }]}>
-                    Valider
+                  <Text style={[styles.buttonText, { fontFamily: fontMedium, color: '#FFF' }]}>
+                     {t('quiz.validate')}
                   </Text>
                 </Pressable>
-              </View>
             </View>
           </Animated.View>
         </View>
@@ -190,69 +149,21 @@ export default function ThemeSelectionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  backgroundImage: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    opacity: 0.4,
-  },
-  curvedHeader: {
-    width: '100%',
-    height: 200,
-    borderBottomLeftRadius: 80,
-    borderBottomRightRadius: 80,
-    overflow: 'hidden',
-  },
-  headerGradient: {
-    flex: 1,
-    paddingBottom: 30,
-    position: 'relative',
-  },
-  starLeft: {
-    position: 'absolute',
-    top: 30,
-    left: 80,
-    opacity: 0.9,
-    transform: [{ rotate: '-15deg' }],
-  },
-  starRight: {
-    position: 'absolute',
-    top: 20,
-    right: 60,
-    opacity: 0.9,
-    transform: [{ rotate: '15deg' }],
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  logoContainer: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  logo: {
-    fontSize: 48,
-    color: '#FFFFFF',
-    letterSpacing: 3,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-  },
-  settingsButton: {
+  backButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
     alignItems: 'center',
-    position: 'absolute',
-    right: 20,
-    top: 0,
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   content: {
     flex: 1,
@@ -265,83 +176,56 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    color: '#374151',
     textAlign: 'center',
-  },
-  emojiContainer: {
-    marginTop: 10,
-  },
-  emoji: {
-    fontSize: 40,
   },
   themesContainer: {
     gap: 16,
-    marginBottom: 30,
   },
   themeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: 20,
     paddingHorizontal: 20,
     borderRadius: 16,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
   },
   themeText: {
     fontSize: 16,
-    color: '#374151',
-  },
-  backButton: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    alignSelf: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#FCD34D',
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
   modalContent: {
-    width: '85%',
-  },
-  modalCard: {
-    backgroundColor: '#FFFFFF',
+    width: '100%',
     borderRadius: 20,
-    padding: 30,
-    position: 'relative',
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  closeButton: {
-    position: 'absolute',
-    top: 15,
-    right: 15,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 20,
   },
   modalTitle: {
     fontSize: 14,
-    color: '#6B7280',
     textAlign: 'center',
-    marginBottom: 16,
-    marginTop: 10,
+    flex: 1,
   },
   modalTheme: {
-    fontSize: 20,
-    color: '#374151',
+    fontSize: 22,
     textAlign: 'center',
     marginBottom: 30,
   },
@@ -349,26 +233,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
-  cancelButton: {
+  button: {
     flex: 1,
-    backgroundColor: '#E5E7EB',
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  cancelText: {
+  cancelButton: {},
+  confirmButton: {},
+  buttonText: {
     fontSize: 16,
-    color: '#6B7280',
-  },
-  confirmButton: {
-    flex: 1,
-    backgroundColor: '#FCD34D',
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  confirmText: {
-    fontSize: 16,
-    color: '#374151',
-  },
+  }
 });

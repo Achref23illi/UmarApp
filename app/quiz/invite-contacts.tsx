@@ -5,16 +5,17 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { QuizBottomNav } from '@/components/quiz/QuizBottomNav';
-import { QuizHeader } from '@/components/quiz/QuizHeader';
+import { Colors } from '@/config/colors';
 import { getFont } from '@/hooks/use-fonts';
+import { useTheme } from '@/hooks/use-theme';
 import { useAppSelector } from '@/store/hooks';
 
 // Mock contact data
@@ -44,6 +45,8 @@ const ALL_CONTACTS: Contact[] = [
 export default function InviteContactsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
+  const { colors } = useTheme();
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
 
   const fontBold = getFont(currentLanguage, 'bold');
@@ -74,7 +77,6 @@ export default function InviteContactsScreen() {
   };
 
   const handleNext = () => {
-    // Navigate to level/theme selection with selected contacts
     const totalSelected = selectedRecentContacts.size + invitedContacts.size;
     router.push({
       pathname: '/quiz/setup-game',
@@ -83,16 +85,20 @@ export default function InviteContactsScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Background Pattern */}
-      <Image
-        source={require('@/assets/images/quizz_background.png')}
-        style={styles.backgroundImage}
-        contentFit="cover"
-      />
-
+    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
       {/* Header */}
-      <QuizHeader />
+      <View style={styles.header}>
+        <Pressable 
+          onPress={() => router.back()} 
+          style={[styles.backButton, { backgroundColor: colors.surface }]}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+        </Pressable>
+         <Text style={[styles.headerTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
+            {t('quiz.invite.title')}
+        </Text>
+        <View style={{ width: 44 }} />
+      </View>
 
       {/* Content */}
       <ScrollView 
@@ -103,26 +109,25 @@ export default function InviteContactsScreen() {
         {/* Add Button and Participants */}
         <View style={styles.topSection}>
           <Pressable
-            style={styles.addButton}
+            style={[styles.addButton, { borderColor: Colors.palette.purple.primary }]}
             onPress={() => router.push('/quiz/add-participants')}
           >
-            <Text style={[styles.addButtonText, { fontFamily: fontMedium }]}>
-              Ajouter
+            <Text style={[styles.addButtonText, { fontFamily: fontMedium, color: Colors.palette.purple.primary }]}>
+              {t('quiz.invite.add_button')}
             </Text>
           </Pressable>
           
           <View style={styles.participantsInfo}>
-            <Text style={[styles.participantsText, { fontFamily: fontRegular }]}>
-              Participants :
+            <Text style={[styles.participantsText, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+              {t('quiz.invite.participants_label')}
             </Text>
-            <Text style={styles.participantsEmoji}>😊</Text>
           </View>
         </View>
 
         {/* Recent Contacts Section */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { fontFamily: fontRegular }]}>
-            Contact recent :
+          <Text style={[styles.sectionTitle, { fontFamily: fontRegular, color: colors.text.primary }]}>
+            {t('quiz.invite.recent_title')}
           </Text>
           
           <ScrollView 
@@ -144,21 +149,22 @@ export default function InviteContactsScreen() {
                   <View style={styles.checkboxContainer}>
                     <View style={[
                       styles.checkbox,
-                      selectedRecentContacts.has(contact.id) && styles.checkboxSelected
+                      { borderColor: colors.border, backgroundColor: colors.surface },
+                      selectedRecentContacts.has(contact.id) && { backgroundColor: Colors.palette.purple.primary, borderColor: Colors.palette.purple.primary }
                     ]}>
                       {selectedRecentContacts.has(contact.id) && (
-                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                        <Ionicons name="checkmark" size={12} color="#FFFFFF" />
                       )}
                     </View>
                   </View>
                   
                   {/* Avatar */}
-                  <View style={styles.avatarCircle}>
-                    <Ionicons name="person" size={32} color="#D1D5DB" />
+                  <View style={[styles.avatarCircle, { backgroundColor: colors.surfaceHighlight || '#F3F4F6' }]}>
+                    <Ionicons name="person" size={24} color={colors.text.secondary} />
                   </View>
                   
                   {/* Name */}
-                  <Text style={[styles.recentContactName, { fontFamily: fontRegular }]}>
+                  <Text style={[styles.recentContactName, { fontFamily: fontRegular, color: colors.text.primary }]} numberOfLines={1}>
                     {contact.name}
                   </Text>
                 </Pressable>
@@ -169,8 +175,8 @@ export default function InviteContactsScreen() {
 
         {/* All Contacts Section */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { fontFamily: fontRegular }]}>
-            Contact
+          <Text style={[styles.sectionTitle, { fontFamily: fontRegular, color: colors.text.primary }]}>
+            {t('quiz.invite.all_title')}
           </Text>
           
           <View style={styles.contactsList}>
@@ -179,21 +185,21 @@ export default function InviteContactsScreen() {
                 key={contact.id}
                 entering={FadeInDown.delay(index * 30).springify()}
               >
-                <View style={styles.contactCard}>
+                <View style={[styles.contactCard, { backgroundColor: colors.surface, shadowColor: colors.text.primary }]}>
                   {/* Avatar */}
-                  <View style={styles.contactAvatar}>
-                    <Ionicons name="person" size={32} color="#D1D5DB" />
+                  <View style={[styles.contactAvatar, { backgroundColor: colors.surfaceHighlight || '#F3F4F6' }]}>
+                    <Ionicons name="person" size={24} color={colors.text.secondary} />
                   </View>
                   
                   {/* Info */}
                   <View style={styles.contactInfo}>
-                    <Text style={[styles.contactName, { fontFamily: fontBold }]}>
+                    <Text style={[styles.contactName, { fontFamily: fontBold, color: colors.text.primary }]}>
                       {contact.name}
                     </Text>
-                    <Text style={[styles.contactLastConnection, { fontFamily: fontRegular }]}>
-                      Dernière connexion:
+                    <Text style={[styles.contactLastConnection, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+                      {t('quiz.invite.last_connection')}
                     </Text>
-                    <Text style={[styles.contactDate, { fontFamily: fontRegular }]}>
+                    <Text style={[styles.contactDate, { fontFamily: fontRegular, color: colors.text.secondary }]}>
                       {contact.lastConnection}
                     </Text>
                   </View>
@@ -202,16 +208,17 @@ export default function InviteContactsScreen() {
                   <Pressable
                     style={[
                       styles.inviteButton,
-                      invitedContacts.has(contact.id) && styles.inviteButtonActive
+                      { borderColor: Colors.palette.purple.primary },
+                      invitedContacts.has(contact.id) && { backgroundColor: Colors.palette.purple.primary }
                     ]}
                     onPress={() => toggleInvite(contact.id)}
                   >
                     <Text style={[
                       styles.inviteButtonText,
-                      { fontFamily: fontMedium },
-                      invitedContacts.has(contact.id) && styles.inviteButtonTextActive
+                      { fontFamily: fontMedium, color: Colors.palette.purple.primary },
+                      invitedContacts.has(contact.id) && { color: '#FFFFFF' }
                     ]}>
-                      Inviter
+                      {t('quiz.invite.invite_action')}
                     </Text>
                   </Pressable>
                 </View>
@@ -233,13 +240,27 @@ export default function InviteContactsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
-  backgroundImage: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    opacity: 0.4,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  headerTitle: {
+      fontSize: 18,
   },
   content: {
     flex: 1,
@@ -259,12 +280,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 20,
     borderWidth: 2,
-    borderColor: '#8B5CF6',
     backgroundColor: 'transparent',
   },
   addButtonText: {
-    fontSize: 16,
-    color: '#8B5CF6',
+    fontSize: 14,
   },
   participantsInfo: {
     flexDirection: 'row',
@@ -273,17 +292,12 @@ const styles = StyleSheet.create({
   },
   participantsText: {
     fontSize: 16,
-    color: '#374151',
-  },
-  participantsEmoji: {
-    fontSize: 24,
   },
   section: {
     marginBottom: 30,
   },
   sectionTitle: {
     fontSize: 18,
-    color: '#374151',
     marginBottom: 16,
   },
   recentContactsScroll: {
@@ -296,7 +310,7 @@ const styles = StyleSheet.create({
   },
   recentContactCard: {
     alignItems: 'center',
-    width: 80,
+    width: 70,
   },
   checkboxContainer: {
     position: 'absolute',
@@ -305,31 +319,23 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: '#D1D5DB',
-    backgroundColor: '#FFFFFF',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  checkboxSelected: {
-    backgroundColor: '#8B5CF6',
-    borderColor: '#8B5CF6',
-  },
   avatarCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#F3F4F6',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
   },
   recentContactName: {
-    fontSize: 12,
-    color: '#374151',
+    fontSize: 11,
     textAlign: 'center',
   },
   contactsList: {
@@ -338,20 +344,17 @@ const styles = StyleSheet.create({
   contactCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     padding: 12,
     borderRadius: 12,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
   },
   contactAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#F3F4F6',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -361,33 +364,22 @@ const styles = StyleSheet.create({
   },
   contactName: {
     fontSize: 16,
-    color: '#374151',
     marginBottom: 2,
   },
   contactLastConnection: {
     fontSize: 11,
-    color: '#9CA3AF',
   },
   contactDate: {
     fontSize: 11,
-    color: '#9CA3AF',
   },
   inviteButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
     borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#8B5CF6',
+    borderWidth: 1,
     backgroundColor: 'transparent',
   },
-  inviteButtonActive: {
-    backgroundColor: '#8B5CF6',
-  },
   inviteButtonText: {
-    fontSize: 14,
-    color: '#8B5CF6',
-  },
-  inviteButtonTextActive: {
-    color: '#FFFFFF',
+    fontSize: 12,
   },
 });

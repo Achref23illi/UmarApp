@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTranslation } from 'react-i18next';
 
 import { PostItem } from '@/components/feed/PostItem';
 import { PrayerBanner } from '@/components/prayer/PrayerBanner';
 import { Colors } from '@/config/colors';
+import { useTheme } from '@/hooks/use-theme';
 import { Post, socialService } from '@/services/socialService';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setAgendaEntries } from '@/store/slices/agendaSlice';
@@ -15,6 +16,7 @@ type FilterType = 'janaza' | 'sick_visit';
 export default function AgendaScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+  const { colors } = useTheme();
   const dispatch = useAppDispatch();
   const agendaState = useAppSelector((s) => s.agenda);
   const [filter, setFilter] = useState<FilterType>('janaza');
@@ -59,28 +61,28 @@ export default function AgendaScreen() {
   const filtered = posts.filter((p) => (filter === 'janaza' ? p.type === 'janaza' : p.type === 'sick_visit'));
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
+    <View style={[styles.container, { paddingTop: insets.top + 8, backgroundColor: colors.background }]}>
       <PrayerBanner style={styles.banner} />
 
-      <View style={styles.toggleRow}>
+      <View style={[styles.toggleRow, { backgroundColor: colors.surfaceHighlight }]}>
         <Pressable
           onPress={() => setFilter('janaza')}
           style={[styles.toggleButton, filter === 'janaza' && styles.toggleActive]}
         >
-          <Text style={[styles.toggleText, filter === 'janaza' && styles.toggleTextActive]}>Salat janaza</Text>
+          <Text style={[styles.toggleText, { color: filter === 'janaza' ? '#FFF' : colors.text.secondary }]}>Salat janaza</Text>
         </Pressable>
         <Pressable
           onPress={() => setFilter('sick_visit')}
           style={[styles.toggleButton, filter === 'sick_visit' && styles.toggleActive]}
         >
-          <Text style={[styles.toggleText, filter === 'sick_visit' && styles.toggleTextActive]}>
+          <Text style={[styles.toggleText, { color: filter === 'sick_visit' ? '#FFF' : colors.text.secondary }]}>
             Visites aux malades
           </Text>
         </Pressable>
       </View>
 
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 24 }} />
+        <ActivityIndicator style={{ marginTop: 24 }} color={colors.primary} />
       ) : (
         <ScrollView
           contentContainerStyle={{ padding: 12, paddingBottom: 24 }}
@@ -89,7 +91,7 @@ export default function AgendaScreen() {
           {filtered.length > 0 ? (
             filtered.map((post) => <PostItem key={post.id} post={post} />)
           ) : (
-            <Text style={styles.empty}>{t('feed.noPosts') || 'Aucune annonce pour le moment.'}</Text>
+            <Text style={[styles.empty, { color: colors.text.secondary }]}>{t('feed.noPosts') || 'Aucune annonce pour le moment.'}</Text>
           )}
         </ScrollView>
       )}
@@ -98,11 +100,10 @@ export default function AgendaScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f8fb' },
+  container: { flex: 1 },
   banner: { marginHorizontal: 12, marginBottom: 8 },
   toggleRow: {
     flexDirection: 'row',
-    backgroundColor: '#ECECF5',
     marginHorizontal: 12,
     marginTop: 8,
     borderRadius: 12,
@@ -117,16 +118,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.palette.purple.primary,
   },
   toggleText: {
-    color: '#6B7280',
     fontWeight: '600',
     fontSize: 13,
   },
   toggleTextActive: {
-    color: '#FFF',
+    // handled inline
   },
   empty: {
     textAlign: 'center',
-    color: '#6B7280',
     marginTop: 24,
   },
 });

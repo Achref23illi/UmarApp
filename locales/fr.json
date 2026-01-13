@@ -146,6 +146,24 @@
   },
   "quran": {
     "title": "Coran",
+    "library_screen": {
+      "title": "Bibliothèque Coranique",
+      "choose_edition": "Choisissez votre Édition",
+      "subtitle": "Sélectionnez votre mode de lecture du Saint Coran",
+      "info": "Les deux éditions contiennent les 114 sourates. Votre progression est sauvegardée automatiquement."
+    },
+    "editions": {
+      "mushaf": {
+        "title": "المصحف",
+        "subtitle": "Mushaf Arabe",
+        "description": "Pages traditionnelles du Coran avec écriture Hafs authentique"
+      },
+      "french": {
+        "title": "Traduction Française",
+        "subtitle": "Traduction Française",
+        "description": "Traduction française complète du Saint Coran"
+      }
+    },
     "continueReading": "Continuer la Lecture",
     "readQuran": "Lire le Coran",
     "startReading": "Commencer la Lecture",
@@ -229,13 +247,123 @@
     "noEvents": "Aucun événement"
   },
   "quiz": {
-    "title": "Quiz",
+    "title": "Arène de Quiz",
     "start": "Commencer",
     "score": "Score",
     "correct": "Correct",
     "incorrect": "Incorrect",
     "nextQuestion": "Question suivante",
-    "finish": "Terminer"
+    "finish": "Terminer",
+    "subtitle": "Choisissez votre mode de jeu",
+    "modes": {
+      "solo": "Solo",
+      "solo_desc": "Jouez seul",
+      "duo": "Duo",
+      "duo_desc": "1 contre 1",
+      "team": "Équipe",
+      "team_desc": "Bataille d'équipe",
+      "group": "Groupe",
+      "group_desc": "Mode groupe"
+    },
+    "play_style": {
+      "title": "Style de jeu",
+      "subtitle": "Comment voulez-vous jouer ?",
+      "face_to_face": "Présentiel",
+      "face_to_face_desc": "Jouer avec des amis à proximité",
+      "remote": "À distance",
+      "remote_desc": "Inviter des amis en ligne"
+    },
+    "levels": {
+      "title": "Évaluons votre niveau",
+      "subtitle": "vous êtes :",
+      "debutant": "DÉBUTANT",
+      "beginner": "DÉBUTANT",
+      "debutant_desc": "J'ai peu ou pas de connaissances",
+      "intermediaire": "INTERMÉDIAIRE",
+      "intermediate": "INTERMÉDIAIRE",
+      "intermediaire_desc": "J'étudie couci-couça",
+      "expert": "EXPERT",
+      "expert_desc": "Vas-y test moi"
+    },
+    "themes": {
+      "title": "Choisissez un thème :",
+      "prophet": "La vie du Prophète sws",
+      "prophethood": "La vie du Prophète sws",
+      "pillars": "Les piliers de l'islam",
+      "faith": "La foi",
+      "quran": "Le Coran",
+      "fiqh": "Jurisprudence",
+      "companions": "Les Compagnons",
+      "sunnah": "La Sunna",
+      "ramadan": "Ramadan",
+      "random": "Aléatoire"
+    },
+    "game": {
+      "theme_label": "Thème :",
+      "question_label": "Question",
+      "points_label": "Points"
+    },
+    "results": {
+      "congrats": "Félicitations",
+      "score_label": "SCORE",
+      "theme_label": "Thème :",
+      "ranking": "Voir le classement",
+      "new_game": "Nouvelle partie",
+      "menu": "Retour au menu"
+    },
+    "back": "Revenir",
+    "validate": "Valider",
+    "selected_theme_label": "Vous avez sélectionné le thème :",
+    "settings": {
+      "title": "Paramètres de jeu",
+      "response_time": "Temps de réponse",
+      "questions_count": "Nombre de questions",
+      "jokers_count": "Nombre de jokers",
+      "helps_count": "Nombre d'aides",
+      "start": "Commencer"
+    },
+    "challenges": {
+      "title": "Challenges",
+      "find_opponent": "Trouver un adversaire",
+      "subtitle": "Défiez d'autres utilisateurs sur le Coran et la Sunnah.",
+      "play": "Jouer",
+      "sent": "Défi envoyé !",
+      "sent_desc": "Vous avez défié {{name}}. En attente de réponse."
+    },
+    "participants": {
+      "title": "Ajouter des participants",
+      "add": "Ajouter",
+      "placeholder": "Nom d'utilisateur",
+      "validate": "Valider",
+      "list_title": "Participants ajoutés",
+      "error_empty": "Veuillez entrer un nom d'utilisateur",
+      "error_exists": "Cet utilisateur est déjà ajouté",
+      "error_min": "Veuillez ajouter au moins un participant"
+    },
+    "invite": {
+      "title": "Inviter des contacts",
+      "add_button": "Ajouter",
+      "participants_label": "Participants :",
+      "recent_title": "Contacts récents :",
+      "all_title": "Contacts",
+      "last_connection": "Dernière connexion :",
+      "invite_action": "Inviter"
+    },
+    "validation": {
+       "title": "Validation du niveau",
+       "subtitle": "Répondez pour confirmer votre niveau.",
+       "question": "Question {{number}}",
+       "answer": "Réponse {{number}}",
+       "welcome_level": "BIENVENUE DANS LE NIVEAU",
+       "continue": "Continuer"
+    },
+    "setup": {
+       "participants_count": "{{count}} participant",
+       "participants_count_plural": "{{count}} participants",
+       "select_level": "Sélectionnez le niveau :",
+       "select_theme": "Choisissez un thème :",
+       "start": "Commencer"
+    }
   },
   "jeneza": {
     "title": "Jeneza",
@@ -449,3 +577,4 @@
     "emptyState": "Aucun commentaire. Soyez le premier !"
   }
 }
+
