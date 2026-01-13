@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, FlatList, Dimensions, ImageBackground } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import ChallengeCategoryCard from '@/components/challenges/ChallengeCategoryCard';
 import MyChallengesView from '@/components/challenges/MyChallengesView';
+import { getFont } from '@/hooks/use-fonts';
+import { useTheme } from '@/hooks/use-theme';
+import { useAppSelector } from '@/store/hooks';
+import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Import images
 const QURAN_IMG = { uri: 'https://images.unsplash.com/photo-1609599006353-e629aaabfeae?w=400&q=80' };
@@ -106,35 +109,49 @@ const CHALLENGES_DATA = [
 export default function ChallengesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { colors } = useTheme();
   const [activeTab, setActiveTab] = useState<'my_challenges' | 'categories'>('categories');
+  
+  const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
+  
+  const fontMedium = getFont(currentLanguage, 'medium');
+  const fontBold = getFont(currentLanguage, 'bold');
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background }]}>
       {/* Header Tabs */}
-      <View style={styles.tabContainer}>
+      <View style={[styles.tabContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <Pressable
           style={[styles.tab, activeTab === 'my_challenges' && styles.activeTab]}
           onPress={() => setActiveTab('my_challenges')}
         >
-          <Text style={[styles.tabText, activeTab === 'my_challenges' && styles.activeTabText]}>
+          <Text style={[
+            styles.tabText, 
+            { fontFamily: fontMedium, color: colors.text.secondary },
+            activeTab === 'my_challenges' && { color: colors.primary, fontFamily: fontBold }
+          ]}>
             Mes challenges
           </Text>
-          {activeTab === 'my_challenges' && <View style={styles.activeLine} />}
+          {activeTab === 'my_challenges' && <View style={[styles.activeLine, { backgroundColor: colors.primary }]} />}
         </Pressable>
 
         <Pressable
           style={[styles.tab, activeTab === 'categories' && styles.activeTab]}
           onPress={() => setActiveTab('categories')}
         >
-          <Text style={[styles.tabText, activeTab === 'categories' && styles.activeTabText]}>
+          <Text style={[
+             styles.tabText, 
+             { fontFamily: fontMedium, color: colors.text.secondary },
+             activeTab === 'categories' && { color: colors.primary, fontFamily: fontBold }
+          ]}>
             Challenge
           </Text>
-          {activeTab === 'categories' && <View style={styles.activeLine} />}
+          {activeTab === 'categories' && <View style={[styles.activeLine, { backgroundColor: colors.primary }]} />}
         </Pressable>
       </View>
 
       {/* Content */}
-      <View style={styles.content}>
+      <View style={[styles.content, { backgroundColor: colors.background }]}>
         {activeTab === 'categories' ? (
           <FlatList
             data={CHALLENGES_DATA}
@@ -169,13 +186,10 @@ export default function ChallengesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff', // White background based on image, or light gray
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   tab: {
     flex: 1,
@@ -184,29 +198,20 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   activeTab: {
-    // Background can change or just the line indicator
   },
   tabText: {
     fontSize: 16,
-    fontFamily: 'Metropolis-Medium',
-    color: '#999',
-  },
-  activeTabText: {
-    color: '#670FA4', // Primary color
-    fontFamily: 'Metropolis-Bold',
   },
   activeLine: {
     position: 'absolute',
     bottom: 0,
     width: '100%',
     height: 3,
-    backgroundColor: '#670FA4',
     borderTopLeftRadius: 3,
     borderTopRightRadius: 3,
   },
   content: {
     flex: 1,
-    backgroundColor: '#f5f5f5', // Light gray background for the list area
   },
   listContent: {
     padding: 16,
@@ -221,12 +226,10 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 8,
   },
   emptySubText: {
     fontSize: 14,
-    color: '#666',
     textAlign: 'center',
   },
 });

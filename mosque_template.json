@@ -1,0 +1,19 @@
+{
+  "name": "Grande Mosquée de Paris",
+  "latitude": 48.8419,
+  "longitude": 2.3551,
+  "address": "2bis Place du Puits de l'Ermite, 75005 Paris, France",
+  "capacity": 2000,
+  "jummahTime": "13:30",
+  "adminPinned": true,
+  "hasWomenSection": true,
+  "hasQuranSession": true,
+  "parkingAvailable": false,
+  "wheelchairAccess": true,
+  "kidsArea": false,
+  "wuduArea": true,
+  "images": [
+    "https://example.com/mosque-main.jpg",
+    "https://example.com/mosque-interior.jpg"
+  ]
+}

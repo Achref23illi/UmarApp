@@ -1,7 +1,8 @@
-import React from 'react';
-import { View, Text, StyleSheet, ImageBackground, ImageSourcePropType } from 'react-native';
+import { useTheme } from '@/hooks/use-theme';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import React from 'react';
+import { ImageBackground, ImageSourcePropType, StyleSheet, Text, View } from 'react-native';
 
 interface ChallengeCategoryCardProps {
   title: string;
@@ -28,24 +29,25 @@ export default function ChallengeCategoryCard({
   isLocked = false,
   color = '#000',
 }: ChallengeCategoryCardProps) {
+  const { colors } = useTheme();
   
   const LeftContent = () => (
     <View style={styles.leftContent}>
        <View style={styles.iconContainer}>
           <Ionicons name={iconName as any} size={32} color={imageSource ? '#fff' : color} />
        </View>
-       <Text style={[styles.title, imageSource && styles.textWhite]} numberOfLines={1} adjustsFontSizeToFit>
+       <Text style={[styles.title, { color: colors.text.primary }, imageSource && styles.textWhite]} numberOfLines={1} adjustsFontSizeToFit>
          {title}
        </Text>
-       {subtitle && <Text style={[styles.subtitle, imageSource && styles.textWhite]}>{subtitle}</Text>}
+       {subtitle && <Text style={[styles.subtitle, { color: colors.text.secondary }, imageSource && styles.textWhite]}>{subtitle}</Text>}
     </View>
   );
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: colors.surface, shadowColor: colors.shadow }]}>
       <View style={styles.contentRow}>
         {/* Left Side: Big Title & Icon with Image Background */}
-        <View style={styles.leftSection}>
+        <View style={[styles.leftSection, { backgroundColor: colors.surfaceHighlight }]}>
             {imageSource ? (
                 <ImageBackground 
                     source={imageSource} 
@@ -65,33 +67,33 @@ export default function ChallengeCategoryCard({
         </View>
 
         {/* Right Side: Description */}
-        <View style={styles.rightSection}>
+        <View style={[styles.rightSection, { borderLeftColor: colors.border }]}>
           <Ionicons name="flower-outline" size={18} color="#9C27B0" style={styles.flowerIcon} />
-          <Text style={styles.description} numberOfLines={6}>
+          <Text style={[styles.description, { color: colors.text.secondary }]} numberOfLines={6}>
             {description || 'Aucune description disponible pour ce challenge.'}
           </Text>
         </View>
       </View>
 
       {/* Footer */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
         <View style={styles.footerItem}>
           <Ionicons name="time-outline" size={16} color="#9C27B0" />
-          <Text style={styles.footerText}>{duration}</Text>
+          <Text style={[styles.footerText, { color: colors.text.secondary }]}>{duration}</Text>
         </View>
         
-        <View style={styles.footerSeparator} />
+        <View style={[styles.footerSeparator, { backgroundColor: colors.border }]} />
         
         <View style={styles.footerItem}>
           <Ionicons name="stats-chart-outline" size={16} color="#9C27B0" />
-          <Text style={styles.footerText}>{levels}</Text>
+          <Text style={[styles.footerText, { color: colors.text.secondary }]}>{levels}</Text>
         </View>
         
-        <View style={styles.footerSeparator} />
+        <View style={[styles.footerSeparator, { backgroundColor: colors.border }]} />
 
         <View style={styles.footerItem}>
           <Text style={styles.prerequisiteLabel}>Pré-requis : </Text>
-          <Text style={styles.prerequisiteValue}>{prerequisite}</Text>
+          <Text style={[styles.prerequisiteValue, { color: colors.text.secondary }]}>{prerequisite}</Text>
         </View>
       </View>
 
@@ -109,11 +111,9 @@ export default function ChallengeCategoryCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     marginBottom: 20,
     marginHorizontal: 4,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
@@ -129,7 +129,6 @@ const styles = StyleSheet.create({
   leftSection: {
     width: 130, // Fixed width for square-ish look
     position: 'relative',
-    backgroundColor: '#F9FAFB',
   },
   imageBackground: {
     width: '100%',
@@ -154,14 +153,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontFamily: 'Metropolis-Bold',
-    color: '#000',
     textAlign: 'center',
     letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 12,
     fontFamily: 'Metropolis-Medium',
-    color: '#666',
     textAlign: 'center',
     marginTop: 2,
   },
@@ -177,12 +174,10 @@ const styles = StyleSheet.create({
     paddingRight: 24, 
     justifyContent: 'center',
     borderLeftWidth: 1,
-    borderLeftColor: '#F3F4F6',
   },
   description: {
     fontSize: 11,
     fontFamily: 'Metropolis-Regular',
-    color: '#4B5563',
     lineHeight: 16,
   },
   flowerIcon: {
@@ -198,8 +193,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    backgroundColor: '#FAFAFA',
   },
   footerItem: {
     flexDirection: 'row',
@@ -209,12 +202,10 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 11,
     fontFamily: 'Metropolis-Medium',
-    color: '#374151',
   },
   footerSeparator: {
     width: 1,
     height: 14,
-    backgroundColor: '#E5E7EB',
   },
   prerequisiteLabel: {
     fontSize: 11,
@@ -224,7 +215,6 @@ const styles = StyleSheet.create({
   prerequisiteValue: {
     fontSize: 11,
     fontFamily: 'Metropolis-Regular',
-    color: '#374151',
   },
   lockOverlay: {
     position: 'absolute',

@@ -9,15 +9,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
+import { Magnetometer } from 'expo-sensors';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Dimensions,
+    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
-    View
+    View,
 } from 'react-native';
 import Animated, {
     FadeIn,
@@ -27,6 +29,7 @@ import Animated, {
     useSharedValue,
     withRepeat,
     withSequence,
+    withSpring,
     withTiming
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -59,7 +62,12 @@ export default function QiblaScreen() {
   const [locationName, setLocationName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [distance, setDistance] = useState(0);
+
   const [currentStep, setCurrentStep] = useState(0);
+  const [heading, setHeading] = useState(0);
+
+  // Compass rotation animation
+  const compassRotation = useSharedValue(0);
 
   // Pulse animation for the arrow
   const pulseScale = useSharedValue(1);
@@ -80,9 +88,58 @@ export default function QiblaScreen() {
   }));
 
   // Get location and fetch Qibla from API
+
   useEffect(() => {
     fetchQiblaDirection();
   }, []);
+
+  // Magnetometer and Heading Logic
+  useEffect(() => {
+    let subscription: any;
+
+    const startMagnetometer = async () => {
+      try {
+        const { status } = await Magnetometer.requestPermissionsAsync();
+        if (status !== 'granted') {
+          return;
+        }
+
+        Magnetometer.setUpdateInterval(100);
+        subscription = Magnetometer.addListener((data) => {
+          const angle = calculateHeading(data.x, data.y);
+          setHeading(angle);
+          // Animate to new heading (negative because we rotate the dial counter to the heading)
+          compassRotation.value = withSpring(-angle, { damping: 20, stiffness: 90 });
+        });
+      } catch (err) {
+        console.error('Magnetometer error:', err);
+      }
+    };
+
+    startMagnetometer();
+
+    return () => {
+      if (subscription) {
+        subscription.remove();
+      }
+    };
+  }, []);
+
+  const calculateHeading = (x: number, y: number) => {
+    let angle = Math.atan2(y, x) * (180 / Math.PI);
+    // Adjust for device orientation
+    if (Platform.OS === 'ios') {
+      angle = angle + 90;
+    }
+    if (angle < 0) {
+      angle += 360;
+    }
+    return angle;
+  };
+
+  const compassStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${compassRotation.value}deg` }],
+  }));
 
   const fetchQiblaDirection = async () => {
     try {
@@ -255,10 +312,14 @@ export default function QiblaScreen() {
           <Animated.View entering={FadeInUp.delay(100).springify()}>
             <LinearGradient
               colors={isDark ? ['#374151', '#1F2937'] : ['#FFFFFF', '#F9FAFB']}
-              style={styles.compassCard}
+                style={styles.compassCard}
             >
+              <Text style={{ position: 'absolute', top: 16, color: isDark ? '#9CA3AF' : '#6B7280', fontSize: 12, fontFamily: fontMedium }}>
+                {Math.round(heading)}° {getCardinalDirection(heading)}
+              </Text>
+
               {/* Compass Visual */}
-              <View style={styles.compassWrapper}>
+              <Animated.View style={[styles.compassWrapper, compassStyle]}>
                 <Svg width={COMPASS_SIZE} height={COMPASS_SIZE} viewBox="0 0 200 200">
                   <Defs>
                     <RadialGradient id="bgGrad" cx="50%" cy="50%" rx="50%" ry="50%">
@@ -317,7 +378,7 @@ export default function QiblaScreen() {
                   <Circle cx="100" cy="100" r="22" fill={isDark ? '#1F2937' : '#FFF'} stroke="#F59E0B" strokeWidth="2" />
                   <SvgText x="100" y="108" fontSize="24" textAnchor="middle">🕋</SvgText>
                 </Svg>
-              </View>
+              </Animated.View>
 
               {/* Direction Display */}
               <Animated.View style={[styles.directionDisplay, pulseStyle]}>

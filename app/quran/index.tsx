@@ -1,12 +1,7 @@
-/**
- * Quran Library Screen
- * ====================
- * Library-style selection between Arabic Mushaf and French Translation
- */
-
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -25,9 +20,6 @@ import { useAppSelector } from '@/store/hooks';
 
 interface QuranEdition {
   id: string;
-  title: string;
-  subtitle: string;
-  description: string;
   icon: string;
   color: string;
   route: string;
@@ -36,18 +28,12 @@ interface QuranEdition {
 const QURAN_EDITIONS: QuranEdition[] = [
   {
     id: 'mushaf',
-    title: 'المصحف',
-    subtitle: 'Arabic Mushaf',
-    description: 'Traditional Quran pages with authentic Hafs script',
     icon: 'book',
     color: '#10B981',
     route: '/quran/surahs',
   },
   {
     id: 'french',
-    title: 'Traduction Française',
-    subtitle: 'French Translation',
-    description: 'Complete French translation of the Holy Quran',
     icon: 'language',
     color: '#3B82F6',
     route: '/quran/french-surahs',
@@ -97,13 +83,13 @@ export default function QuranLibraryScreen() {
             {/* Content */}
             <View style={styles.editionContent}>
               <Text style={[styles.editionTitle, { fontFamily: fontBold }]}>
-                {edition.title}
+                {t(`quran.editions.${edition.id}.title`)}
               </Text>
               <Text style={[styles.editionSubtitle, { fontFamily: fontMedium }]}>
-                {edition.subtitle}
+                {t(`quran.editions.${edition.id}.subtitle`)}
               </Text>
               <Text style={[styles.editionDescription, { fontFamily: fontRegular }]}>
-                {edition.description}
+                {t(`quran.editions.${edition.id}.description`)}
               </Text>
             </View>
             
@@ -119,13 +105,14 @@ export default function QuranLibraryScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </Pressable>
         <Text style={[styles.headerTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
-          {t('common.quran') || 'Quran Library'}
+          {t('quran.library_screen.title') || 'Bibliothèque Coranique'}
         </Text>
         <View style={styles.backButton} />
       </View>
@@ -137,10 +124,10 @@ export default function QuranLibraryScreen() {
         {/* Library Intro */}
         <Animated.View entering={FadeInDown.delay(100)}>
           <Text style={[styles.sectionTitle, { fontFamily: fontSemiBold, color: colors.text.primary }]}>
-            📚 Choose Your Edition
+            📚 {t('quran.library_screen.choose_edition')}
           </Text>
           <Text style={[styles.sectionSubtitle, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-            Select how you'd like to read the Holy Quran
+            {t('quran.library_screen.subtitle')}
           </Text>
         </Animated.View>
 
@@ -156,7 +143,7 @@ export default function QuranLibraryScreen() {
         >
           <Ionicons name="information-circle" size={24} color={colors.primary} />
           <Text style={[styles.infoText, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-            Both editions contain all 114 Surahs of the Holy Quran. Your reading progress is saved automatically.
+            {t('quran.library_screen.info')}
           </Text>
         </Animated.View>
       </ScrollView>

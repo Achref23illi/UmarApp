@@ -1,18 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Dimensions, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Colors } from '@/config/colors';
 import { getFont } from '@/hooks/use-fonts';
+import { useTheme } from '@/hooks/use-theme';
 import { useAppSelector } from '@/store/hooks';
 
 const { width } = Dimensions.get('window');
-const CARD_SIZE = (width - 60) / 2; // 2 cards per row with padding
+const CARD_MARGIN = 16;
+const CARD_SIZE = (width - 40 - CARD_MARGIN) / 2;
 
 export default function QuizzScreen() {
   const insets = useSafeAreaInsets();
@@ -20,9 +22,9 @@ export default function QuizzScreen() {
   const { t } = useTranslation();
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
   const currentUser = useAppSelector((state) => state.user);
+  const { colors, isDark } = useTheme();
   
-  // Get user gender (default to male if not set)
-  const userGender = currentUser.gender || 'male';
+
   
   const fontBold = getFont(currentLanguage, 'bold');
   const fontMedium = getFont(currentLanguage, 'medium');
@@ -36,40 +38,42 @@ export default function QuizzScreen() {
   const modes = [
     { 
       id: 'solo', 
-      title: 'Solo', 
+      title: t('quiz.modes.solo'), 
+      subtitle: t('quiz.modes.solo_desc'),
       icon: 'person',
-      color: '#8B5CF6',
-      route: '/quiz/level-selection' // Navigate to level selection
+      gradient: [Colors.palette.purple.light, Colors.palette.purple.primary] as const,
+      route: '/quiz/level-selection' 
     },
     { 
       id: 'duo', 
-      title: 'Duo', 
+      title: t('quiz.modes.duo'), 
+      subtitle: t('quiz.modes.duo_desc'),
       icon: 'people',
-      color: '#8B5CF6',
-      route: '/quiz' // Navigate to find opponent
+      gradient: [Colors.palette.purple.primary, Colors.palette.purple.dark] as const,
+      route: '/quiz' 
     },
     { 
       id: 'equipe', 
-      title: 'Équipe', 
-      icon: 'people',
-      color: '#8B5CF6',
-      route: '/challenge' // Team mode
+      title: t('quiz.modes.team'), 
+      subtitle: t('quiz.modes.team_desc'),
+      icon: 'people-circle',
+      gradient: [Colors.palette.purple.light, Colors.palette.purple.primary] as const,
+      route: '/challenge' 
     },
     { 
       id: 'groupe', 
-      title: 'Groupe', 
-      icon: 'people',
-      color: '#8B5CF6',
-      route: '/challenge' // Group mode
+      title: t('quiz.modes.group'), 
+      subtitle: t('quiz.modes.group_desc'),
+      icon: 'grid',
+      gradient: [Colors.palette.gold.primary, Colors.palette.gold.dark] as const,
+      route: '/challenge' 
     },
   ];
 
   const handleModePress = (mode: typeof modes[0]) => {
     if (mode.id === 'solo') {
-      // Solo goes to level selection
       router.push('/quiz/level-selection');
     } else {
-      // Duo, Équipe, Groupe show the Présentiel/À distance modal
       setSelectedMode(mode.id);
       setShowModeModal(true);
     }
@@ -79,104 +83,72 @@ export default function QuizzScreen() {
     setShowModeModal(false);
     
     if (playMode === 'presentiel') {
-      // Présentiel: Add participants in real-time mode
       router.push('/quiz/add-participants');
     } else {
-      // À distance: Invite contacts
       router.push('/quiz/invite-contacts');
     }
   };
 
-  // Render avatar based on gender and mode
-  const renderAvatar = (mode: typeof modes[0]) => {
-    const avatarSource = userGender === 'female' 
-      ? require('@/assets/images/woman.png')
-      : require('@/assets/images/man.png');
-
-    const renderCount = mode.id === 'solo' ? 1 : mode.id === 'duo' ? 2 : mode.id === 'equipe' ? 4 : 6;
-
-    // Layout configurations for different modes
-    const layouts = {
-      solo: [{ top: 40, left: '50%', transform: [{ translateX: -25 }] }],
-      duo: [
-        { top: 35, left: 20 },
-        { top: 35, right: 20 },
-      ],
-      equipe: [
-        { top: 25, left: 10 },
-        { top: 25, right: 10 },
-        { bottom: 25, left: 10 },
-        { bottom: 25, right: 10 },
-      ],
-      groupe: [
-        { top: 20, left: 15 },
-        { top: 20, right: 15 },
-        { top: 50, left: '50%', transform: [{ translateX: -20 }] },
-        { bottom: 20, left: 5 },
-        { bottom: 20, right: 5 },
-        { bottom: 50, left: '50%', transform: [{ translateX: -20 }] },
-      ],
-    };
-
-    return (
-      <View style={styles.avatarContainer}>
-        {layouts[mode.id as keyof typeof layouts].map((position, index) => (
-          <Image
-            key={index}
-            source={avatarSource}
-            style={[styles.avatar, position]}
-            contentFit="contain"
-          />
-        ))}
-        
-        {/* VS text for duo and equipe */}
-        {(mode.id === 'duo' || mode.id === 'equipe') && (
-          <Text style={styles.vsText}>vs</Text>
-        )}
-      </View>
-    );
-  };
-
   return (
-    <View style={styles.container}>
-      {/* Background Pattern Image */}
-      <Image
-        source={require('@/assets/images/quizz_background.png')}
-        style={styles.backgroundImage}
-        contentFit="cover"
-      />
-
-      {/* Decorative curved header */}
-      <View style={styles.curvedHeader}>
-        <LinearGradient
-          colors={['#7C3AED', '#A855F7']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.headerGradient}
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      
+      {/* Header Section */}
+      <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
+        <View>
+          <Text style={[styles.headerTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
+            {t('quiz.title')}
+          </Text>
+          <Text style={[styles.headerSubtitle, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+            {t('quiz.subtitle')}
+          </Text>
+        </View>
+        <Pressable 
+          style={[styles.settingsButton, { backgroundColor: colors.surfaceHighlight }]}
+          onPress={() => router.push('/settings')}
         >
-          {/* Star decorations */}
-          <Ionicons name="star" size={60} color="#FCD34D" style={styles.starLeft} />
-          <Ionicons name="star" size={40} color="#FCD34D" style={styles.starRight} />
-          
-          <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-            <View style={styles.logoContainer}>
-              <Text style={[styles.logo, { fontFamily: fontBold }]}>QUIZZ</Text>
-            </View>
-          </View>
-        </LinearGradient>
+          <Ionicons name="settings-outline" size={24} color={colors.icon} />
+        </Pressable>
       </View>
 
-      {/* Welcome Message */}
-      <View style={styles.welcomeContainer}>
-        <Text style={[styles.welcomeText, { fontFamily: fontRegular }]}>
-          Hello ! Vous souhaitez
-        </Text>
-        <Text style={[styles.welcomeText, { fontFamily: fontRegular }]}>
-          participer en :
-        </Text>
-        <View style={styles.emojiContainer}>
-          <Text style={styles.emoji}>😊</Text>
-        </View>
+      {/* Main Content */}
+      <View style={styles.gridContainer}>
+        {modes.map((mode, index) => (
+          <Animated.View
+            key={mode.id}
+            entering={FadeInDown.delay(index * 100).springify()}
+            style={styles.cardWrapper}
+          >
+            <Pressable
+              style={({ pressed }) => [
+                styles.card,
+                { transform: [{ scale: pressed ? 0.98 : 1 }] }
+              ]}
+              onPress={() => handleModePress(mode)}
+            >
+              <LinearGradient
+                colors={mode.gradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.cardGradient}
+              >
+                <View style={styles.cardIconContainer}>
+                  <Ionicons name={mode.icon as any} size={32} color="#FFF" />
+                </View>
+                <View>
+                  <Text style={[styles.cardTitle, { fontFamily: fontBold }]}>
+                    {mode.title}
+                  </Text>
+                  <Text style={[styles.cardSubtitle, { fontFamily: fontMedium }]}>
+                    {mode.subtitle}
+                  </Text>
+                </View>
+                
+                {/* Decorative circle */}
+                <View style={styles.decorativeCircle} />
+              </LinearGradient>
+            </Pressable>
+          </Animated.View>
+        ))}
       </View>
 
       {/* Play Mode Selection Modal */}
@@ -186,144 +158,72 @@ export default function QuizzScreen() {
         animationType="fade"
         onRequestClose={() => setShowModeModal(false)}
       >
-        <View style={styles.modalOverlay}>
+        <Pressable style={styles.modalOverlay} onPress={() => setShowModeModal(false)}>
           <Animated.View 
-            entering={FadeIn.duration(200)}
-            style={styles.modalContent}
+            entering={FadeInDown.springify()}
+            style={[styles.modalContent, { backgroundColor: colors.surface }]}
           >
-            {/* Curved Header */}
-            <View style={styles.modalCurvedHeader}>
-              <LinearGradient
-                colors={['#7C3AED', '#A855F7']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.modalHeaderGradient}
-              >
-                <View style={styles.modalHeader}>
-                  <View style={styles.modalLogoContainer}>
-                    <Text style={[styles.modalLogo, { fontFamily: fontBold }]}>QUIZZ</Text>
-                    <Ionicons name="star" size={28} color="#FCD34D" style={styles.starIcon} />
-                  </View>
-                  <Pressable onPress={() => setShowModeModal(false)}>
-                    <Ionicons name="settings-outline" size={24} color="#FFF" />
-                  </Pressable>
-                </View>
-              </LinearGradient>
-            </View>
-
-            {/* Modal Content */}
-            <View style={styles.modalBody}>
-              <Text style={[styles.modalTitle, { fontFamily: fontBold }]}>
-                Mode de jeu :
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
+                {t('quiz.play_style.title')}
               </Text>
-              <View style={styles.modalEmojiContainer}>
-                <Text style={styles.emoji}>😊</Text>
-              </View>
+              <Text style={[styles.modalSubtitle, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+                {t('quiz.play_style.subtitle')}
+              </Text>
+            </View>
 
-              {/* Play Mode Cards */}
-              <View style={styles.modalCardsContainer}>
-                {/* Présentiel Card */}
-                <Animated.View entering={FadeInDown.delay(100).springify()}>
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.modalCard,
-                      { transform: [{ scale: pressed ? 0.95 : 1 }] }
-                    ]}
-                    onPress={() => handlePlayModeSelect('presentiel')}
-                  >
-                    <View style={styles.modalCardContent}>
-                      {/* 3 avatars for Présentiel */}
-                      <View style={styles.modalAvatarContainer}>
-                        <Image
-                          source={require('@/assets/images/man.png')}
-                          style={[styles.modalAvatar, { top: 20, left: 10 }]}
-                          contentFit="contain"
-                        />
-                        <Image
-                          source={require('@/assets/images/man.png')}
-                          style={[styles.modalAvatar, { top: 5, left: '50%', transform: [{ translateX: -25 }] }]}
-                          contentFit="contain"
-                        />
-                        <Image
-                          source={require('@/assets/images/man.png')}
-                          style={[styles.modalAvatar, { top: 20, right: 10 }]}
-                          contentFit="contain"
-                        />
-                      </View>
-                      <Text style={[styles.modalCardTitle, { fontFamily: fontBold }]}>
-                        Présentiel
-                      </Text>
-                    </View>
-                  </Pressable>
-                </Animated.View>
+            <View style={styles.modalOptionsContainer}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.modalOption,
+                  { 
+                    backgroundColor: colors.surfaceHighlight,
+                    transform: [{ scale: pressed ? 0.98 : 1 }]
+                  }
+                ]}
+                onPress={() => handlePlayModeSelect('presentiel')}
+              >
+                <View style={[styles.modalIconBox, { backgroundColor: Colors.palette.purple.light }]}>
+                  <Ionicons name="location" size={24} color="#FFF" />
+                </View>
+                <View style={styles.modalOptionText}>
+                  <Text style={[styles.modalOptionTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
+                    {t('quiz.play_style.face_to_face')}
+                  </Text>
+                  <Text style={[styles.modalOptionDesc, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+                    {t('quiz.play_style.face_to_face_desc')}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={24} color={colors.icon} />
+              </Pressable>
 
-                {/* À distance Card */}
-                <Animated.View entering={FadeInDown.delay(200).springify()}>
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.modalCard,
-                      { transform: [{ scale: pressed ? 0.95 : 1 }] }
-                    ]}
-                    onPress={() => handlePlayModeSelect('distance')}
-                  >
-                    <View style={styles.modalCardContent}>
-                      {/* 2 avatars with phones for À distance */}
-                      <View style={styles.modalAvatarContainer}>
-                        <Image
-                          source={require('@/assets/images/man_with_phone.png')}
-                          style={[styles.modalAvatar, { top: 15, left: 20 }]}
-                          contentFit="contain"
-                        />
-                        <Image
-                          source={require('@/assets/images/man_with_phone_back.png')}
-                          style={[styles.modalAvatar, { top: 15, right: 20 }]}
-                          contentFit="contain"
-                        />
-                      </View>
-                      <Text style={[styles.modalCardTitle, { fontFamily: fontBold }]}>
-                        À distance
-                      </Text>
-                    </View>
-                  </Pressable>
-                </Animated.View>
-              </View>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.modalOption,
+                  { 
+                    backgroundColor: colors.surfaceHighlight,
+                    transform: [{ scale: pressed ? 0.98 : 1 }]
+                  }
+                ]}
+                onPress={() => handlePlayModeSelect('distance')}
+              >
+                <View style={[styles.modalIconBox, { backgroundColor: Colors.palette.purple.dark }]}>
+                  <Ionicons name="phone-portrait" size={24} color="#FFF" />
+                </View>
+                <View style={styles.modalOptionText}>
+                  <Text style={[styles.modalOptionTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
+                    {t('quiz.play_style.remote')}
+                  </Text>
+                  <Text style={[styles.modalOptionDesc, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+                    {t('quiz.play_style.remote_desc')}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={24} color={colors.icon} />
+              </Pressable>
             </View>
           </Animated.View>
-        </View>
+        </Pressable>
       </Modal>
-
-      {/* Quiz Mode Cards */}
-      <View style={styles.cardsContainer}>
-        {modes.map((mode, index) => (
-          <Animated.View
-            key={mode.id}
-            entering={FadeInDown.delay(index * 100).springify()}
-          >
-            <Pressable
-              style={({ pressed }) => [
-                styles.card,
-                { transform: [{ scale: pressed ? 0.95 : 1 }] }
-              ]}
-              onPress={() => handleModePress(mode)}
-            >
-              <View style={styles.cardContent}>
-                {renderAvatar(mode)}
-                <Text style={[styles.cardTitle, { fontFamily: fontBold }]}>
-                  {mode.title}
-                </Text>
-              </View>
-            </Pressable>
-          </Animated.View>
-        ))}
-      </View>
-
-      {/* Settings Button at Bottom */}
-      <Pressable 
-        style={[styles.settingsButtonBottom, { paddingBottom: insets.bottom + 16 }]}
-        onPress={() => router.push('/settings')}
-      >
-        <Ionicons name="settings-outline" size={28} color="#7C3AED" />
-      </Pressable>
 
     </View>
   );
@@ -332,225 +232,134 @@ export default function QuizzScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  backgroundImage: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    opacity: 0.4,
-  },
-  curvedHeader: {
-    width: '100%',
-    height: 200,
-    borderBottomLeftRadius: 80,
-    borderBottomRightRadius: 80,
-    overflow: 'hidden',
-    marginBottom: 20,
-  },
-  headerGradient: {
-    flex: 1,
-    paddingBottom: 30,
-    position: 'relative',
-  },
-  starLeft: {
-    position: 'absolute',
-    top: 30,
-    left: 80,
-    opacity: 0.9,
-    transform: [{ rotate: '-15deg' }],
-  },
-  starRight: {
-    position: 'absolute',
-    top: 20,
-    right: 60,
-    opacity: 0.9,
-    transform: [{ rotate: '15deg' }],
   },
   header: {
+    paddingHorizontal: 24,
+    paddingBottom: 24,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
   },
-  logoContainer: {
-    flex: 1,
-    alignItems: 'center',
+  headerTitle: {
+    fontSize: 32,
+    marginBottom: 4,
   },
-  logo: {
-    fontSize: 48,
-    color: '#FFFFFF',
-    letterSpacing: 3,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+  headerSubtitle: {
+    fontSize: 16,
   },
-  settingsButtonBottom: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#FFFFFF',
+  settingsButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    alignSelf: 'center',
-    marginTop: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
   },
-  welcomeContainer: {
-    alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 30,
-  },
-  welcomeText: {
-    fontSize: 20,
-    color: '#374151',
-    textAlign: 'center',
-  },
-  emojiContainer: {
-    marginTop: 10,
-  },
-  emoji: {
-    fontSize: 40,
-  },
-  cardsContainer: {
+  gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    padding: 20,
+    gap: CARD_MARGIN,
     justifyContent: 'center',
-    paddingHorizontal: 20,
-    gap: 16,
+  },
+  cardWrapper: {
+    width: CARD_SIZE,
+    height: CARD_SIZE * 1.2,
   },
   card: {
-    width: CARD_SIZE,
-    height: CARD_SIZE,
-    backgroundColor: '#7C3AED',
-    borderRadius: 20,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  cardContent: {
     flex: 1,
+    borderRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  cardGradient: {
+    flex: 1,
+    borderRadius: 24,
+    padding: 20,
     justifyContent: 'space-between',
-  },
-  avatarContainer: {
-    flex: 1,
+    overflow: 'hidden',
     position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  avatar: {
-    position: 'absolute',
+  cardIconContainer: {
     width: 50,
     height: 50,
-  },
-  vsText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    textAlign: 'center',
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   cardTitle: {
-    fontSize: 22,
-    color: '#FFFFFF',
-    textAlign: 'center',
+    fontSize: 20,
+    color: '#FFF',
+    marginBottom: 4,
+  },
+  cardSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  decorativeCircle: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    top: -20,
+    right: -20,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
   },
   modalContent: {
-    width: width * 0.9,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    overflow: 'hidden',
-    maxHeight: '80%',
-  },
-  modalCurvedHeader: {
-    width: '100%',
-    height: 160,
-    borderBottomLeftRadius: 60,
-    borderBottomRightRadius: 60,
-    overflow: 'hidden',
-  },
-  modalHeaderGradient: {
-    flex: 1,
-    paddingBottom: 20,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: 24,
+    paddingBottom: 40,
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    marginBottom: 32,
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  modalLogoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  modalLogo: {
-    fontSize: 32,
-    color: '#FFFFFF',
-    letterSpacing: 2,
-  },
-  modalBody: {
-    padding: 20,
-    paddingTop: 10,
   },
   modalTitle: {
     fontSize: 24,
-    color: '#374151',
-    textAlign: 'center',
-    marginBottom: 5,
+    marginBottom: 8,
   },
-  modalEmojiContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
+  modalSubtitle: {
+    fontSize: 16,
   },
-  modalCardsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+  modalOptionsContainer: {
     gap: 16,
   },
-  modalCard: {
-    width: (width * 0.9 - 60) / 2,
-    height: (width * 0.9 - 60) / 2,
-    backgroundColor: '#7C3AED',
-    borderRadius: 20,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  modalCardContent: {
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  modalAvatarContainer: {
-    flex: 1,
-    position: 'relative',
-    justifyContent: 'center',
+  modalOption: {
+    flexDirection: 'row',
     alignItems: 'center',
+    padding: 20,
+    borderRadius: 20,
   },
-  modalAvatar: {
-    position: 'absolute',
+  modalIconBox: {
     width: 50,
     height: 50,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
   },
-  modalCardTitle: {
+  modalOptionText: {
+    flex: 1,
+  },
+  modalOptionTitle: {
     fontSize: 18,
-    color: '#FFFFFF',
-    textAlign: 'center',
+    marginBottom: 4,
+  },
+  modalOptionDesc: {
+    fontSize: 14,
   },
 });

@@ -8,6 +8,7 @@ import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MahramOathModal } from '@/components/challenges/MahramOathModal';
+import { Colors } from '@/config/colors';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
 import { MOCK_USERS, User, socialService } from '@/services/socialService';
@@ -22,7 +23,7 @@ export default function QuizScreen() {
   
   // User State
   const currentUser = useAppSelector((state) => state.user);
-  // Fallback if gender is not set (e.g. mock or old profile)
+  // Fallback if gender is not set
   const userGender = currentUser.gender || 'male'; 
 
   const fontRegular = getFont(currentLanguage, 'regular');
@@ -38,10 +39,8 @@ export default function QuizScreen() {
     setSelectedOpponent(opponent);
 
     if (userGender === opponent.gender) {
-      // Same gender: Allow immediately
       startChallenge(opponent);
     } else {
-      // Different gender: Require Oath
       setOathVisible(true);
     }
   };
@@ -54,13 +53,12 @@ export default function QuizScreen() {
   };
 
   const startChallenge = async (opponent: User) => {
-    // Optimistic UI update or wait for result
     const success = await socialService.createMatch(opponent.id);
     
     if (success) {
         Alert.alert(
-        "Challenge Sent!",
-        `You have challenged ${opponent.name}. Waiting for them to accept.`,
+        t('quiz.challenges.sent'),
+        t('quiz.challenges.sent_desc', { name: opponent.name }),
         [{ text: "OK" }]
         );
     } else {
@@ -69,10 +67,10 @@ export default function QuizScreen() {
   };
 
   const renderUserItem = ({ item }: { item: User }) => {
-    if (item.id === currentUser.id) return null; // Don't show self
+    if (item.id === currentUser.id) return null;
 
     return (
-      <View style={[styles.userCard, { backgroundColor: colors.surface }]}>
+      <View style={[styles.userCard, { backgroundColor: colors.surface, shadowColor: colors.text.primary }]}>
         <Image source={{ uri: item.avatar }} style={styles.avatar} contentFit="cover" />
         <View style={styles.userInfo}>
            <Text style={[styles.userName, { fontFamily: fontBold, color: colors.text.primary }]}>
@@ -83,10 +81,10 @@ export default function QuizScreen() {
            </Text>
         </View>
         <Pressable 
-          style={[styles.challengeButton, { backgroundColor: colors.primary }]}
+          style={[styles.challengeButton, { backgroundColor: Colors.palette.purple.primary }]}
           onPress={() => handleChallenge(item)}
         >
-           <Text style={[styles.challengeText, { fontFamily: fontMedium }]}>{t('common.play') || "Play"}</Text>
+           <Text style={[styles.challengeText, { fontFamily: fontMedium }]}>{t('quiz.challenges.play')}</Text>
         </Pressable>
       </View>
     );
@@ -105,17 +103,17 @@ export default function QuizScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </Pressable>
         <Text style={[styles.headerTitle, { fontFamily: fontSemiBold, color: colors.text.primary }]}>
-           Challenges
+           {t('quiz.challenges.title')}
         </Text>
         <View style={{ width: 44 }} />
       </View>
 
       <View style={styles.titleContainer}>
         <Text style={[styles.pageTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
-            Find an Opponent
+            {t('quiz.challenges.find_opponent')}
         </Text>
         <Text style={[styles.pageSubtitle, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-            Challenge others in Quran & Sunnah quizzes.
+            {t('quiz.challenges.subtitle')}
         </Text>
       </View>
 
@@ -153,6 +151,10 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   headerTitle: {
       fontSize: 18,
@@ -160,24 +162,26 @@ const styles = StyleSheet.create({
   titleContainer: {
     paddingHorizontal: 20,
     marginBottom: 10,
+    marginTop: 10,
   },
   pageTitle: {
-    fontSize: 28,
+    fontSize: 24,
     marginBottom: 8,
   },
   pageSubtitle: {
-    fontSize: 16,
+    fontSize: 14,
+    lineHeight: 20,
   },
   listContent: {
     padding: 16,
+    paddingTop: 10,
   },
   userCard: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
     marginBottom: 12,
-    borderRadius: 12,
-    shadowColor: '#000',
+    borderRadius: 16,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -197,13 +201,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   userLevel: {
-    fontSize: 13,
+    fontSize: 12,
     marginTop: 2,
   },
   challengeButton: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
   },
   challengeText: {
     color: '#FFF',
