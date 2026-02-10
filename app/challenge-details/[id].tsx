@@ -1,45 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors } from '@/config/colors';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
+import { ChallengeLevelWithUserState, challengeDetailsService } from '@/services/challengeDetailsService';
 import { useAppSelector } from '@/store/hooks';
-
-// Mock Levels Data
-const LEVELS = [
-  {
-    id: '1',
-    title: 'Niveau 1',
-    subtitle: 'Initiation',
-    description: 'Apprendre les bases et commencer la lecture régulière.',
-    duration: '1 Semaine',
-    status: 'active', // active, locked, completed
-    progress: 0,
-  },
-  {
-    id: '2',
-    title: 'Niveau 2',
-    subtitle: 'Intermédiaire',
-    description: 'Augmenter le volume de lecture et la compréhension.',
-    duration: '2 Semaines',
-    status: 'locked',
-    progress: 0,
-  },
-  {
-    id: '3',
-    title: 'Niveau 3',
-    subtitle: 'Avancé',
-    description: 'Maîtrise et méditation profonde.',
-    duration: '3 Semaines',
-    status: 'locked',
-    progress: 0,
-  },
-];
 
 export default function ChallengeDetailsScreen() {
   const { id } = useLocalSearchParams();
@@ -52,24 +22,64 @@ export default function ChallengeDetailsScreen() {
   const fontMedium = getFont(currentLanguage, 'medium');
   const fontRegular = getFont(currentLanguage, 'regular');
 
-  // Hardcoded challenge info for demo
-  const challengeTitle = id === '1' ? 'Challenge Coran' : 'Challenge';
+  const slug = useMemo(() => (typeof id === 'string' ? id : Array.isArray(id) ? id[0] : ''), [id]);
 
-  const handleLevelPress = (level: typeof LEVELS[0]) => {
+  const [challengeTitle, setChallengeTitle] = useState<string>('Challenge');
+  const [levels, setLevels] = useState<ChallengeLevelWithUserState[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const load = async () => {
+      try {
+        setIsLoading(true);
+        setLoadError(null);
+
+        if (!slug) {
+          setChallengeTitle('Challenge');
+          setLevels([]);
+          return;
+        }
+
+        const data = await challengeDetailsService.getChallengeCategoryWithLevels(slug, currentLanguage);
+        if (!isActive) return;
+
+        if (!data) {
+          setChallengeTitle('Challenge');
+          setLevels([]);
+          setLoadError('Challenge not found');
+          return;
+        }
+
+        setChallengeTitle(data.category.title);
+        setLevels(data.levels);
+      } catch (error) {
+        console.error('Failed to load challenge details:', error);
+        if (!isActive) return;
+        setLoadError('Unable to load challenge');
+      } finally {
+        if (!isActive) return;
+        setIsLoading(false);
+      }
+    };
+
+    load();
+
+    return () => {
+      isActive = false;
+    };
+  }, [slug, currentLanguage]);
+
+  const handleLevelPress = (level: ChallengeLevelWithUserState) => {
     if (level.status === 'locked') return;
-    
-    if (id === '1') {
-      router.push({
-        pathname: '/challenge-details/config',
-        params: { levelId: level.id, challengeId: id }
-      });
-    } else {
-      // Navigate to the dashboard for this level
-      router.push({
-        pathname: '/challenge-details/level/[id]',
-        params: { id: level.id, challengeId: id }
-      });
-    }
+
+    // Always go through config for now (saves settings + starts the level)
+    router.push({
+      pathname: '/challenge-details/config',
+      params: { levelId: level.id, challengeSlug: slug },
+    });
   };
 
   return (
@@ -89,6 +99,16 @@ export default function ChallengeDetailsScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
         showsVerticalScrollIndicator={false}
       >
+        {isLoading ? (
+          <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={Colors.palette.purple.primary} />
+          </View>
+        ) : loadError ? (
+          <View style={{ paddingVertical: 24 }}>
+            <Text style={{ fontFamily: fontBold, color: colors.text.primary }}>{loadError}</Text>
+          </View>
+        ) : null}
+
         <Text style={[styles.introTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
           Votre Parcours
         </Text>
@@ -98,11 +118,11 @@ export default function ChallengeDetailsScreen() {
 
         {/* Level Map */}
         <View style={styles.mapContainer}>
-           {LEVELS.map((level, index) => {
+           {levels.map((level, index) => {
              const isLocked = level.status === 'locked';
              const isActive = level.status === 'active';
              const isCompleted = level.status === 'completed';
-             const isLast = index === LEVELS.length - 1;
+             const isLast = index === levels.length - 1;
 
              return (
                <Animated.View 
@@ -181,7 +201,7 @@ export default function ChallengeDetailsScreen() {
                        <View style={styles.durationBadge}>
                           <Ionicons name="time-outline" size={14} color={colors.text.secondary} />
                           <Text style={[styles.durationText, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-                            {level.duration}
+                            {level.durationDays} jours
                           </Text>
                        </View>
                        

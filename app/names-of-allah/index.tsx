@@ -20,36 +20,12 @@ import {
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { NAMES_OF_ALLAH, NameOfAllah } from '@/config/namesOfAllah';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
 import { useAppSelector } from '@/store/hooks';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-// Sample of 99 Names (abbreviated for brevity, you can add all 99)
-const NAMES_OF_ALLAH = [
-  { id: 1, arabic: 'الرَّحْمَنُ', transliteration: 'Ar-Rahman', meaning: 'The Most Gracious' },
-  { id: 2, arabic: 'الرَّحِيمُ', transliteration: 'Ar-Raheem', meaning: 'The Most Merciful' },
-  { id: 3, arabic: 'الْمَلِكُ', transliteration: 'Al-Malik', meaning: 'The King' },
-  { id: 4, arabic: 'الْقُدُّوسُ', transliteration: 'Al-Quddus', meaning: 'The Most Holy' },
-  { id: 5, arabic: 'السَّلَامُ', transliteration: 'As-Salam', meaning: 'The Source of Peace' },
-  { id: 6, arabic: 'الْمُؤْمِنُ', transliteration: 'Al-Mu\'min', meaning: 'The Guardian of Faith' },
-  { id: 7, arabic: 'الْمُهَيْمِنُ', transliteration: 'Al-Muhaymin', meaning: 'The Protector' },
-  { id: 8, arabic: 'الْعَزِيزُ', transliteration: 'Al-Aziz', meaning: 'The Almighty' },
-  { id: 9, arabic: 'الْجَبَّارُ', transliteration: 'Al-Jabbar', meaning: 'The Compeller' },
-  { id: 10, arabic: 'الْمُتَكَبِّرُ', transliteration: 'Al-Mutakabbir', meaning: 'The Greatest' },
-  { id: 11, arabic: 'الْخَالِقُ', transliteration: 'Al-Khaliq', meaning: 'The Creator' },
-  { id: 12, arabic: 'الْبَارِئُ', transliteration: 'Al-Bari', meaning: 'The Evolver' },
-  { id: 13, arabic: 'الْمُصَوِّرُ', transliteration: 'Al-Musawwir', meaning: 'The Fashioner' },
-  { id: 14, arabic: 'الْغَفَّارُ', transliteration: 'Al-Ghaffar', meaning: 'The Forgiving' },
-  { id: 15, arabic: 'الْقَهَّارُ', transliteration: 'Al-Qahhar', meaning: 'The Subduer' },
-  { id: 16, arabic: 'الْوَهَّابُ', transliteration: 'Al-Wahhab', meaning: 'The Bestower' },
-  { id: 17, arabic: 'الرَّزَّاقُ', transliteration: 'Ar-Razzaq', meaning: 'The Provider' },
-  { id: 18, arabic: 'الْفَتَّاحُ', transliteration: 'Al-Fattah', meaning: 'The Opener' },
-  { id: 19, arabic: 'اَلْعَلِيْمُ', transliteration: 'Al-Alim', meaning: 'The All-Knowing' },
-  { id: 20, arabic: 'الْقَابِضُ', transliteration: 'Al-Qabid', meaning: 'The Constrictor' },
-  // Add more names as needed...
-];
 
 export default function NamesOfAllahScreen() {
   const router = useRouter();
@@ -66,11 +42,12 @@ export default function NamesOfAllahScreen() {
 
   const filteredNames = NAMES_OF_ALLAH.filter(
     name => 
+      name.arabic.includes(searchQuery) ||
       name.transliteration.toLowerCase().includes(searchQuery.toLowerCase()) ||
       name.meaning.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const renderItem = ({ item, index }: { item: typeof NAMES_OF_ALLAH[0]; index: number }) => (
+  const renderItem = ({ item, index }: { item: NameOfAllah; index: number }) => (
     <Animated.View entering={FadeInDown.delay(index * 50).springify()}>
       <Pressable style={[styles.nameCard, { backgroundColor: colors.surface }]}>
         <LinearGradient
@@ -106,7 +83,7 @@ export default function NamesOfAllahScreen() {
         </Pressable>
         <View style={styles.headerTextContainer}>
           <Text style={[styles.headerTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
-            99 Names of Allah
+            {t('namesOfAllah.title')}
           </Text>
           <Text style={[styles.headerSubtitle, { fontFamily: fontMedium, color: colors.text.secondary }]}>
             أسماء الله الحسنى
@@ -120,7 +97,7 @@ export default function NamesOfAllahScreen() {
         <Ionicons name="search" size={20} color={colors.text.secondary} />
         <TextInput
           style={[styles.searchInput, { fontFamily: fontRegular, color: colors.text.primary }]}
-          placeholder="Search names..."
+          placeholder={t('common.search')}
           placeholderTextColor={colors.text.disabled}
           value={searchQuery}
           onChangeText={setSearchQuery}

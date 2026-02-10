@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import React from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Pressable,
@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
+import { userStatsService } from '@/services/userStatsService';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setLanguage } from '@/store/slices/languageSlice';
 import { logoutUser, setTheme } from '@/store/slices/userSlice';
@@ -34,12 +35,51 @@ export default function SettingsScreen() {
   const fontSemiBold = getFont(currentLanguage, 'semiBold');
   const fontBold = getFont(currentLanguage, 'bold');
 
+  const [points, setPoints] = useState(0);
+  const [badges, setBadges] = useState<string[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      const loadStats = async () => {
+        try {
+          if (!userData.isAuthenticated) {
+            if (isActive) {
+              setPoints(0);
+              setBadges([]);
+            }
+            return;
+          }
+
+          const stats = await userStatsService.getUserStats();
+          if (!isActive) return;
+
+          setPoints(stats.points);
+          setBadges(stats.badges);
+        } catch (error) {
+          console.error('Failed to load user stats:', error);
+          if (isActive) {
+            setPoints(0);
+            setBadges([]);
+          }
+        }
+      };
+
+      loadStats();
+
+      return () => {
+        isActive = false;
+      };
+    }, [userData.isAuthenticated])
+  );
+
   const user = {
     name: userData.name || 'User',
     email: userData.email || '',
     isPremium: false,
-    points: 1250,
-    badges: ['Early Bird', 'Quiz Master'],
+    points,
+    badges,
     avatar: userData.avatar_url,
   };
 

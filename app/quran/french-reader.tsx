@@ -6,9 +6,11 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -18,8 +20,10 @@ import {
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { toast } from '@/components/ui/Toast';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
+import { challengeDetailsService } from '@/services/challengeDetailsService';
 import { SURAHS } from '@/services/quranData';
 import { FrenchSurah, getFrenchSurah } from '@/services/quranFrench';
 import { saveReadingProgress } from '@/services/quranProgress';
@@ -29,10 +33,20 @@ export default function FrenchReaderScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const { chapterId, chapterName } = useLocalSearchParams<{
-    chapterId: string;
+  const params = useLocalSearchParams<{
+    chapterId?: string;
     chapterName?: string;
+    challengeLevelId?: string;
+    challengeRequiredSurahs?: string;
   }>();
+  const chapterIdParam = typeof params.chapterId === 'string' ? params.chapterId : '1';
+  const chapterName = typeof params.chapterName === 'string' ? params.chapterName : undefined;
+  const challengeLevelId =
+    typeof params.challengeLevelId === 'string' ? params.challengeLevelId : undefined;
+  const challengeRequiredSurahsRaw =
+    typeof params.challengeRequiredSurahs === 'string'
+      ? params.challengeRequiredSurahs
+      : undefined;
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
 
   const fontRegular = getFont(currentLanguage, 'regular');
@@ -45,13 +59,82 @@ export default function FrenchReaderScreen() {
   const [error, setError] = useState<string | null>(null);
   const [fontSize, setFontSize] = useState(18);
   const [currentVerse, setCurrentVerse] = useState(1);
+  const [showArabic, setShowArabic] = useState(true);
+  const [challengeReadSurahs, setChallengeReadSurahs] = useState<number[]>([]);
+  const [hasMarkedChallengeSurah, setHasMarkedChallengeSurah] = useState(false);
+  const [isMarkingChallengeSurah, setIsMarkingChallengeSurah] = useState(false);
+  const [scrollViewportHeight, setScrollViewportHeight] = useState(0);
+  const [scrollContentHeight, setScrollContentHeight] = useState(0);
 
-  const surahNumber = parseInt(chapterId || '1');
+  const surahNumber = parseInt(chapterIdParam || '1');
   const surahMeta = SURAHS.find(s => s.number === surahNumber);
+  const challengeRequiredSurahs = useMemo(
+    () =>
+      [...new Set(
+        (challengeRequiredSurahsRaw ?? '')
+          .split(',')
+          .map((value) => Number.parseInt(value.trim(), 10))
+          .filter((value) => Number.isInteger(value) && value >= 1 && value <= 114)
+      )].sort((a, b) => a - b),
+    [challengeRequiredSurahsRaw]
+  );
+  const hasChallengeContext =
+    !!challengeLevelId &&
+    challengeRequiredSurahs.length > 0 &&
+    challengeRequiredSurahs.includes(surahNumber);
+
+  const challengeReadCount = useMemo(
+    () =>
+      Math.min(
+        challengeReadSurahs.filter((surah) => challengeRequiredSurahs.includes(surah)).length,
+        challengeRequiredSurahs.length
+      ),
+    [challengeReadSurahs, challengeRequiredSurahs]
+  );
 
   useEffect(() => {
     loadSurah();
-  }, [chapterId]);
+  }, [chapterIdParam]);
+
+  useEffect(() => {
+    setHasMarkedChallengeSurah(false);
+    setScrollContentHeight(0);
+    setScrollViewportHeight(0);
+  }, [surahNumber, challengeLevelId, challengeRequiredSurahsRaw]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadChallengeProgress = async () => {
+      if (!challengeLevelId || challengeRequiredSurahs.length === 0) {
+        setChallengeReadSurahs([]);
+        setHasMarkedChallengeSurah(false);
+        return;
+      }
+
+      try {
+        const progress = await challengeDetailsService.getTodayQuranReadProgress({
+          levelId: challengeLevelId,
+          requiredSurahs: challengeRequiredSurahs,
+        });
+        if (!isActive) return;
+        setChallengeReadSurahs(progress.readSurahs);
+        if (progress.readSurahs.includes(surahNumber)) {
+          setHasMarkedChallengeSurah(true);
+        }
+      } catch (err) {
+        console.error('Failed to load Quran challenge progress:', err);
+        if (!isActive) return;
+        setChallengeReadSurahs([]);
+      }
+    };
+
+    loadChallengeProgress();
+
+    return () => {
+      isActive = false;
+    };
+  }, [challengeLevelId, challengeRequiredSurahs, surahNumber]);
 
   const loadSurah = async () => {
     try {
@@ -59,21 +142,25 @@ export default function FrenchReaderScreen() {
       setError(null);
       
       const data = await getFrenchSurah(surahNumber);
-      if (data) {
-        setSurahData(data);
-        
-        // Save progress
-        await saveReadingProgress({
-          surahNumber: surahNumber,
-          surahName: surahMeta?.name || '',
-          surahEnglishName: surahMeta?.transliteration || '',
-          ayahNumber: 1,
-          juz: 1,
-          page: 1,
-          totalAyahsInSurah: surahMeta?.verses || 0,
-          lastReadAt: new Date().toISOString(),
-        });
+      if (!data) {
+        setSurahData(null);
+        setError("Échec du chargement de la sourate. Veuillez réessayer.");
+        return;
       }
+
+      setSurahData(data);
+      
+      // Save progress
+      await saveReadingProgress({
+        surahNumber: surahNumber,
+        surahName: surahMeta?.name || '',
+        surahEnglishName: surahMeta?.transliteration || '',
+        ayahNumber: 1,
+        juz: 1,
+        page: 1,
+        totalAyahsInSurah: surahMeta?.verses || 0,
+        lastReadAt: new Date().toISOString(),
+      });
     } catch (err) {
       console.error('Error loading French surah:', err);
       setError('Échec du chargement de la sourate. Veuillez vérifier votre connexion Internet.');
@@ -81,6 +168,105 @@ export default function FrenchReaderScreen() {
       setLoading(false);
     }
   };
+
+  const markChallengeSurahAsRead = useCallback(async () => {
+    if (!challengeLevelId || challengeRequiredSurahs.length === 0) return;
+    if (!challengeRequiredSurahs.includes(surahNumber)) return;
+    if (hasMarkedChallengeSurah || isMarkingChallengeSurah) return;
+
+    try {
+      setIsMarkingChallengeSurah(true);
+
+      const result = await challengeDetailsService.markTodayQuranSurahRead({
+        levelId: challengeLevelId,
+        surahNumber,
+        requiredSurahs: challengeRequiredSurahs,
+      });
+
+      setChallengeReadSurahs(result.readSurahs);
+      setHasMarkedChallengeSurah(true);
+
+      if (result.newlyCompletedDay) {
+        let completionMessage = "Objectif Quran du jour validé. Qu'Allah accepte.";
+        try {
+          const levelDashboard = await challengeDetailsService.getLevelDashboard(
+            challengeLevelId,
+            currentLanguage
+          );
+          if (levelDashboard.daysLeft === 0) {
+            const categoryWithLevels = await challengeDetailsService.getChallengeCategoryWithLevels(
+              'quran',
+              currentLanguage
+            );
+            const nextActiveLevel = categoryWithLevels?.levels.find((item) => item.status === 'active');
+            if (nextActiveLevel && nextActiveLevel.id !== challengeLevelId) {
+              completionMessage = `Niveau débloqué: ${nextActiveLevel.title}`;
+            } else if (categoryWithLevels?.levels.every((item) => item.status === 'completed')) {
+              completionMessage = 'MashaAllah, vous avez terminé ce challenge.';
+            }
+          }
+        } catch (notifyError) {
+          console.error('Failed to resolve challenge advance notification:', notifyError);
+        }
+
+        toast.show({
+          message: completionMessage,
+          type: 'success',
+        });
+      } else if (result.newlyMarkedSurah) {
+        toast.show({
+          message: `${surahMeta?.transliteration ?? `Sourate ${surahNumber}`} validée.`,
+          type: 'success',
+        });
+      }
+    } catch (err) {
+      console.error('Failed to mark Quran challenge surah as read:', err);
+    } finally {
+      setIsMarkingChallengeSurah(false);
+    }
+  }, [
+    challengeLevelId,
+    challengeRequiredSurahs,
+    surahNumber,
+    hasMarkedChallengeSurah,
+    isMarkingChallengeSurah,
+    currentLanguage,
+    surahMeta?.transliteration,
+  ]);
+
+  const handleReaderScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (!hasChallengeContext) return;
+      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+      const reachedBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 30;
+      if (reachedBottom) {
+        markChallengeSurahAsRead();
+      }
+    },
+    [hasChallengeContext, markChallengeSurahAsRead]
+  );
+
+  useEffect(() => {
+    if (!hasChallengeContext || hasMarkedChallengeSurah) return;
+    if (scrollViewportHeight <= 0 || scrollContentHeight <= 0) return;
+
+    // If no scroll is needed, consider the surah read after a brief dwell.
+    if (scrollContentHeight <= scrollViewportHeight + 16) {
+      const timer = setTimeout(() => {
+        markChallengeSurahAsRead();
+      }, 900);
+
+      return () => clearTimeout(timer);
+    }
+
+    return undefined;
+  }, [
+    hasChallengeContext,
+    hasMarkedChallengeSurah,
+    scrollViewportHeight,
+    scrollContentHeight,
+    markChallengeSurahAsRead,
+  ]);
 
   const handleVersePress = async (verseNumber: number) => {
     setCurrentVerse(verseNumber);
@@ -97,6 +283,16 @@ export default function FrenchReaderScreen() {
     });
   };
 
+  const openArabicMushaf = () => {
+    router.push({
+      pathname: '/quran/mushaf',
+      params: {
+        chapterId: surahNumber.toString(),
+        chapterName: surahMeta?.name || '',
+      },
+    });
+  };
+
   const navigateSurah = (direction: 'prev' | 'next') => {
     const newSurah = direction === 'next' ? surahNumber + 1 : surahNumber - 1;
     
@@ -104,7 +300,9 @@ export default function FrenchReaderScreen() {
       const newMeta = SURAHS.find(s => s.number === newSurah);
       router.setParams({ 
         chapterId: newSurah.toString(),
-        chapterName: newMeta?.transliteration
+        chapterName: newMeta?.transliteration,
+        challengeLevelId,
+        challengeRequiredSurahs: challengeRequiredSurahsRaw,
       });
       setCurrentVerse(1);
     }
@@ -152,12 +350,27 @@ export default function FrenchReaderScreen() {
               {chapterName || surahMeta?.transliteration}
             </Text>
             <Text style={[styles.surahInfo, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-              {surahMeta?.verses} Versets • Traduction Française
+              {surahMeta?.verses} Versets • {showArabic ? 'Arabe + Traduction Française' : 'Traduction Française'}
             </Text>
+            {challengeLevelId && challengeRequiredSurahs.length > 0 ? (
+              <Text
+                style={[
+                  styles.challengeInfo,
+                  {
+                    fontFamily: fontMedium,
+                    color: challengeReadCount >= challengeRequiredSurahs.length
+                      ? '#4CAF50'
+                      : colors.text.secondary,
+                  },
+                ]}
+              >
+                Challenge du jour: {challengeReadCount}/{challengeRequiredSurahs.length}
+              </Text>
+            ) : null}
           </View>
           
-          <Pressable style={styles.headerButton}>
-            <Ionicons name="bookmark-outline" size={22} color={colors.text.primary} />
+          <Pressable style={styles.headerButton} onPress={openArabicMushaf}>
+            <Ionicons name="book-outline" size={22} color={colors.text.primary} />
           </Pressable>
         </View>
         
@@ -178,6 +391,22 @@ export default function FrenchReaderScreen() {
           >
             <Text style={[styles.controlText, { color: colors.text.primary }]}>A+</Text>
           </Pressable>
+          <Pressable
+            onPress={() => setShowArabic((prev) => !prev)}
+            style={[
+              styles.controlButton,
+              { backgroundColor: showArabic ? colors.primary + '20' : colors.surfaceHighlight },
+            ]}
+          >
+            <Text
+              style={[
+                styles.controlText,
+                { color: showArabic ? colors.primary : colors.text.primary, fontSize: 12 },
+              ]}
+            >
+              AR
+            </Text>
+          </Pressable>
         </View>
       </View>
 
@@ -185,13 +414,21 @@ export default function FrenchReaderScreen() {
       {surahNumber !== 9 && surahNumber !== 1 && (
         <View style={[styles.bismillah, { backgroundColor: colors.surface }]}>
           <Text style={[styles.bismillahText, { color: colors.primary }]}>
-            Au nom d'Allah, le Tout Miséricordieux, le Très Miséricordieux
+            Au nom d’Allah, le Tout Miséricordieux, le Très Miséricordieux
           </Text>
         </View>
       )}
 
       {/* Verses */}
       <ScrollView 
+        onLayout={(event) => {
+          setScrollViewportHeight(event.nativeEvent.layout.height);
+        }}
+        onContentSizeChange={(_, height) => {
+          setScrollContentHeight(height);
+        }}
+        onScroll={handleReaderScroll}
+        scrollEventThrottle={120}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
@@ -235,6 +472,19 @@ export default function FrenchReaderScreen() {
                 </View>
                 
                 {/* Verse Text */}
+                {showArabic && verse.arabicText ? (
+                  <Text
+                    style={[
+                      styles.arabicVerseText,
+                      {
+                        color: colors.primary,
+                      },
+                    ]}
+                  >
+                    {verse.arabicText}
+                  </Text>
+                ) : null}
+
                 <Text 
                   style={[
                     styles.verseText, 
@@ -345,6 +595,10 @@ const styles = StyleSheet.create({
   surahInfo: {
     fontSize: 12,
   },
+  challengeInfo: {
+    marginTop: 4,
+    fontSize: 12,
+  },
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -423,6 +677,15 @@ const styles = StyleSheet.create({
   },
   verseText: {
     paddingRight: 40,
+  },
+  arabicVerseText: {
+    textAlign: 'right',
+    writingDirection: 'rtl',
+    fontSize: 28,
+    lineHeight: 48,
+    marginBottom: 12,
+    paddingRight: 40,
+    fontFamily: 'System',
   },
   navigation: {
     flexDirection: 'row',

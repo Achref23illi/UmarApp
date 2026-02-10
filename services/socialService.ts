@@ -180,126 +180,7 @@ export interface QuizProgress {
   status: 'in_progress' | 'completed';
 }
 
-
-export const MOCK_USERS: User[] = [
-  { id: 'u1', name: 'Umar Admin', avatar: 'https://i.pravatar.cc/150?u=u1', isVerified: true, gender: 'male' },
-  { id: 'u2', name: 'Ahmed Ali', avatar: 'https://i.pravatar.cc/150?u=u2', gender: 'male' },
-  { id: 'u3', name: 'Sarah Khan', avatar: 'https://i.pravatar.cc/150?u=u3', gender: 'female' },
-];
-
-export const MOCK_POSTS: Post[] = [
-  {
-    id: 'p1',
-    type: 'janaza',
-    user: MOCK_USERS[0],
-    content: 'Annonce Janaza: Frère Ibrahim est décédé aujourd\'hui. La prière aura lieu à la Grande Mosquée de Paris après Asr.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-    likes: 124,
-    comments: 45,
-    shares: 12,
-    janazaData: {
-      deceasedName: 'Ibrahim Al-Fulan',
-      deceasedGender: 'male',
-      prayerTime: 'Après Asr (16h45)',
-      mosqueName: 'Grande Mosquée de Paris',
-      mosqueLocation: { lat: 48.8419, lng: 2.3551 },
-      cemeteryName: 'Cimetière de Thiais',
-      cemeteryAddress: '261 Route de Fontainebleau, 94320 Thiais',
-    },
-    location: { lat: 48.8419, lng: 2.3551 },
-  },
-  {
-    id: 'p2',
-    type: 'sick_visit',
-    user: MOCK_USERS[1],
-    content: 'Frère Yunus se rétablit à l\'Hôpital de la Pitié-Salpêtrière. Merci de lui rendre visite pendant les heures de visite.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    likes: 45,
-    comments: 12,
-    shares: 5,
-    sickVisitData: {
-      patientName: 'Yunus',
-      hospitalName: 'Hôpital Pitié-Salpêtrière',
-      hospitalLocation: { lat: 48.8398, lng: 2.3653 },
-      visitingHours: '15h - 17h',
-      ward: 'Pavillon 3, Chambre 501',
-    },
-    location: { lat: 48.8398, lng: 2.3653 },
-  },
-  {
-    id: 'p3',
-    type: 'general',
-    user: MOCK_USERS[0],
-    content: 'Opération nettoyage du quartier ce dimanche ! Venez nombreux.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-    likes: 89,
-    comments: 23,
-    shares: 2,
-    location: { lat: 48.8566, lng: 2.3522 },
-  },
-  {
-    id: 'p4',
-    type: 'janaza',
-    user: MOCK_USERS[0],
-    content: 'Alerte Janaza: Sœur Amina. Prière demain après Dhuhr.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    likes: 245,
-    comments: 89,
-    shares: 56,
-    janazaData: {
-      deceasedName: 'Amina Bint Fulana',
-      deceasedGender: 'female',
-      prayerTime: 'Après Dhuhr (13h30)',
-      mosqueName: 'Mosquée de Vitry-sur-Seine',
-      mosqueLocation: { lat: 48.7876, lng: 2.3925 },
-      cemeteryName: 'Cimetière de Thiais',
-      cemeteryAddress: '261 Route de Fontainebleau, 94320 Thiais',
-    },
-    location: { lat: 48.7876, lng: 2.3925 },
-  },
-];
-
 const ITEM_LIMIT = 5;
-
-// Mock Admin-Pinned Mosques
-export const MOCK_MOSQUES: Mosque[] = [
-  {
-    id: 'm1',
-    name: 'Grande Mosquée de Paris',
-    latitude: 48.8419,
-    longitude: 2.3551,
-    address: '2bis Place du Puits de l\'Ermite, 75005 Paris',
-    hasWomenSection: true,
-    parkingAvailable: false,
-    capacity: 2000,
-    jummahTime: '13:30',
-    adminPinned: true,
-  },
-  {
-    id: 'm2',
-    name: 'Mosquée de la Défense',
-    latitude: 48.8924,
-    longitude: 2.2361,
-    address: 'Place Carpeaux, 92800 Puteaux',
-    hasWomenSection: false,
-    parkingAvailable: true,
-    capacity: 500,
-    jummahTime: '13:15',
-    adminPinned: true,
-  },
-  {
-    id: 'm3',
-    name: 'Mosquée de Vitry-sur-Seine',
-    latitude: 48.7876,
-    longitude: 2.3925,
-    address: '113 Rue Julian Grimau, 94400 Vitry-sur-Seine',
-    hasWomenSection: true,
-    parkingAvailable: true,
-    capacity: 800,
-    jummahTime: '13:00',
-    adminPinned: false, // Community added
-  }
-];
 
 export const socialService = {
   getPosts: async (page: number = 1, userId?: string, userLocation?: { lat: number; lng: number }): Promise<Post[]> => {
@@ -718,6 +599,25 @@ export const socialService = {
 
   // --- Notifications ---
 
+  getUnreadNotificationsCount: async (): Promise<number> => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) return 0;
+
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', session.session.user.id)
+        .eq('is_read', false);
+
+      if (error) throw error;
+      return count ?? 0;
+    } catch (error) {
+      console.error('getUnreadNotificationsCount error:', error);
+      return 0;
+    }
+  },
+
   getNotifications: async () => {
     try {
         const { data: session } = await supabase.auth.getSession();
@@ -892,7 +792,7 @@ export const socialService = {
       }));
     } catch (error) {
       console.error('getMosques error:', error);
-      return MOCK_MOSQUES;
+      return [];
     }
   },
 

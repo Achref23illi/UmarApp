@@ -2,16 +2,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MahramOathModal } from '@/components/challenges/MahramOathModal';
 import { Colors } from '@/config/colors';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
-import { MOCK_USERS, User, socialService } from '@/services/socialService';
+import { supabase } from '@/lib/supabase';
+import { User, socialService } from '@/services/socialService';
 import { useAppSelector } from '@/store/hooks';
 
 export default function QuizScreen() {
@@ -34,6 +35,47 @@ export default function QuizScreen() {
   // Logic State
   const [selectedOpponent, setSelectedOpponent] = useState<User | null>(null);
   const [oathVisible, setOathVisible] = useState(false);
+  const [opponents, setOpponents] = useState<User[]>([]);
+  const [isLoadingOpponents, setIsLoadingOpponents] = useState(true);
+  const [opponentsError, setOpponentsError] = useState<string | null>(null);
+
+  const loadOpponents = async () => {
+    try {
+      setIsLoadingOpponents(true);
+      setOpponentsError(null);
+
+      const { data, error } = await supabase
+        .from('public_profiles')
+        .select('id, full_name, avatar_url, gender, is_verified, updated_at')
+        .order('updated_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      const mapped = ((data ?? []) as any[])
+        .filter((p) => p?.id && p.id !== currentUser.id)
+        .map<User>((p) => ({
+          id: p.id,
+          name: p.full_name || 'User',
+          avatar: p.avatar_url || `https://i.pravatar.cc/150?u=${encodeURIComponent(p.id)}`,
+          isVerified: p.is_verified ?? undefined,
+          gender: p.gender === 'female' ? 'female' : p.gender === 'male' ? 'male' : undefined,
+        }));
+
+      setOpponents(mapped);
+    } catch (e) {
+      console.error('Failed to load opponents:', e);
+      setOpponents([]);
+      setOpponentsError('Unable to load opponents');
+    } finally {
+      setIsLoadingOpponents(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOpponents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser.id]);
 
   const handleChallenge = (opponent: User) => {
     setSelectedOpponent(opponent);
@@ -117,13 +159,29 @@ export default function QuizScreen() {
         </Text>
       </View>
 
-      <FlatList
-        data={MOCK_USERS}
-        keyExtractor={(item) => item.id}
-        renderItem={renderUserItem}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      {isLoadingOpponents ? (
+        <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      ) : opponentsError ? (
+        <View style={{ paddingHorizontal: 16, paddingVertical: 24, alignItems: 'center', gap: 12 }}>
+          <Text style={{ color: colors.text.secondary, fontFamily: fontRegular }}>{opponentsError}</Text>
+          <Pressable
+            onPress={loadOpponents}
+            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Text style={{ color: colors.primary, fontFamily: fontSemiBold }}>Retry</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <FlatList
+          data={opponents}
+          keyExtractor={(item) => item.id}
+          renderItem={renderUserItem}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
 
       <MahramOathModal
         visible={oathVisible}

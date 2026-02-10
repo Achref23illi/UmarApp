@@ -1,8 +1,8 @@
 
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
     FadeIn,
     SlideInRight,
@@ -13,94 +13,375 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import ContentTab from '@/components/challenge-details/ContentTab';
+import { toast } from '@/components/ui/Toast';
 import { Colors } from '@/config/colors';
+import { ChallengeLevelNumber, QURAN_PLANS, SADAQA_PLANS, clampDay, getPlanForDay } from '@/config/challengeContent';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
+import { ChallengeLevel, ChallengeLevelDashboard, challengeDetailsService } from '@/services/challengeDetailsService';
+import { challengeService } from '@/services/challengeService';
+import { SURAHS } from '@/services/quranData';
 import { useAppSelector } from '@/store/hooks';
-
-// Mock Data for Dashboard
-const DASHBOARD_DATA = {
-  streak: 5,
-  daysLeft: 2,
-  progress: 0.7,
-  totalRead: 142,
-  completionRate: 85,
-  weeklyActivity: [
-    { day: 'Lun', value: 2, full: true },
-    { day: 'Mar', value: 2, full: true },
-    { day: 'Mer', value: 1, full: false },
-    { day: 'Jeu', value: 2, full: true },
-    { day: 'Ven', value: 0, full: false },
-    { day: 'Sam', value: 2, full: true },
-    { day: 'Dim', value: 2, full: true }, // Today
-  ]
-};
 
 // Types for Tabs
 type DashboardTab = 'content' | 'progression' | 'group' | 'details';
+type AdvanceBadgeState = {
+  message: string;
+  nextLevelId?: string;
+  challengeCompleted?: boolean;
+};
+type QuranTodayStatus = {
+  readCount: number;
+  requiredCount: number;
+  completedToday: boolean;
+};
 
 export default function LevelDashboardScreen() {
-  const { id, challengeId } = useLocalSearchParams();
+  const { id, challengeSlug } = useLocalSearchParams();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
   const fontBold = getFont(currentLanguage, 'bold');
   const fontMedium = getFont(currentLanguage, 'medium');
   const fontRegular = getFont(currentLanguage, 'regular');
 
+  const levelId = typeof id === 'string' ? id : Array.isArray(id) ? id[0] : '';
+  const slugParam = typeof challengeSlug === 'string' ? challengeSlug : Array.isArray(challengeSlug) ? challengeSlug[0] : '';
+
   const [activeTab, setActiveTab] = useState<DashboardTab>('content');
-  const [isDone, setIsDone] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(6); // Default to last day (Sun)
+  const [level, setLevel] = useState<ChallengeLevel | null>(null);
+  const [dashboard, setDashboard] = useState<ChallengeLevelDashboard | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [resolvedChallengeSlug, setResolvedChallengeSlug] = useState<string>(slugParam);
+  const [advanceBadge, setAdvanceBadge] = useState<AdvanceBadgeState | null>(null);
+  const [quranTodayStatus, setQuranTodayStatus] = useState<QuranTodayStatus | null>(null);
+
+  const challengeKind = resolvedChallengeSlug || slugParam;
+
+  const load = useCallback(async () => {
+    try {
+      if (!levelId) {
+        setLevel(null);
+        setDashboard(null);
+        setResolvedChallengeSlug(slugParam);
+        setQuranTodayStatus(null);
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setLoadError(null);
+
+      const [lvl, dash] = await Promise.all([
+        challengeDetailsService.getLevelById(levelId),
+        challengeDetailsService.getLevelDashboard(levelId, currentLanguage),
+      ]);
+
+      // Prefer the slug derived from the level's category_id (source of truth).
+      let nextSlug = slugParam;
+      if (lvl?.categoryId) {
+        const category = await challengeService.getCategoryById(lvl.categoryId);
+        nextSlug = category?.slug ?? nextSlug;
+      }
+
+      let nextQuranStatus: QuranTodayStatus | null = null;
+      if (lvl && nextSlug === 'quran') {
+        const levelNumber = (lvl.levelNumber ?? 1) as ChallengeLevelNumber;
+        const plans = QURAN_PLANS[levelNumber] ?? [];
+        const duration = lvl.durationDays ?? 0;
+        const computedDay = duration
+          ? clampDay(Math.max(0, duration - (dash?.daysLeft ?? duration)) + 1, duration)
+          : 1;
+        const plan = getPlanForDay(plans, computedDay);
+        const requiredSurahs = [
+          ...new Set(
+            (plan?.surahs ?? []).filter(
+              (surah) => Number.isInteger(surah) && surah >= 1 && surah <= 114
+            )
+          ),
+        ].sort((a, b) => a - b);
+
+        if (requiredSurahs.length > 0) {
+          const progress = await challengeDetailsService.getTodayQuranReadProgress({
+            levelId: lvl.id,
+            requiredSurahs,
+          });
+          nextQuranStatus = {
+            readCount: progress.readSurahs.filter((surah) => requiredSurahs.includes(surah)).length,
+            requiredCount: requiredSurahs.length,
+            completedToday: progress.completedToday,
+          };
+        } else {
+          nextQuranStatus = {
+            readCount: 0,
+            requiredCount: 0,
+            completedToday: dash.doneToday,
+          };
+        }
+      }
+
+      setResolvedChallengeSlug(nextSlug);
+      setLevel(lvl);
+      setDashboard(dash);
+      setQuranTodayStatus(nextQuranStatus);
+      setSelectedDay(6);
+    } catch (error) {
+      console.error('Failed to load level dashboard:', error);
+      setLoadError('Unable to load level');
+      setLevel(null);
+      setDashboard(null);
+      setQuranTodayStatus(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [levelId, slugParam, currentLanguage]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+      return undefined;
+    }, [load])
+  );
+
+  const levelNumber = (level?.levelNumber ?? 1) as ChallengeLevelNumber;
+
+  const currentDayNumber = useMemo(() => {
+    const duration = level?.durationDays ?? 0;
+    if (!duration) return 1;
+    const completedDays = Math.max(0, duration - (dashboard?.daysLeft ?? duration));
+    return clampDay(completedDays + 1, duration);
+  }, [level?.durationDays, dashboard?.daysLeft]);
+
+  const quranPlanToday = useMemo(() => {
+    if (challengeKind !== 'quran') return null;
+    const plans = QURAN_PLANS[levelNumber] ?? [];
+    const d = clampDay(currentDayNumber, plans.length || 1);
+    return getPlanForDay(plans, d);
+  }, [challengeKind, levelNumber, currentDayNumber]);
+
+  const sadaqaPlanToday = useMemo(() => {
+    if (challengeKind !== 'sadaqa') return null;
+    const plans = SADAQA_PLANS[levelNumber] ?? [];
+    const d = clampDay(currentDayNumber, plans.length || 1);
+    return getPlanForDay(plans, d);
+  }, [challengeKind, levelNumber, currentDayNumber]);
+
+  const activityUnitLabel = challengeKind === 'quran' ? 'pages' : 'actions';
+
+  const actionTitle =
+    challengeKind === 'quran'
+      ? 'Lecture du jour'
+      : challengeKind === 'salat_obligatoire'
+        ? 'Objectif du jour'
+        : challengeKind === 'sadaqa'
+          ? 'Acte du jour'
+          : "Aujourd'hui";
+
+  const actionButtonLabel =
+    challengeKind === 'quran'
+      ? 'Lire le Coran'
+      : challengeKind === 'salat_obligatoire'
+        ? 'Mes Prières'
+        : challengeKind === 'sadaqa'
+          ? 'Mon Acte du Jour'
+          : 'Continuer';
+
+  const actionIconName: keyof typeof Ionicons.glyphMap =
+    challengeKind === 'quran'
+      ? 'book-outline'
+      : challengeKind === 'salat_obligatoire'
+        ? 'time-outline'
+        : challengeKind === 'sadaqa'
+          ? 'heart-outline'
+          : 'sparkles-outline';
+
+  const actionColor =
+    challengeKind === 'quran'
+      ? Colors.palette.purple.primary
+      : challengeKind === 'salat_obligatoire'
+        ? Colors.palette.gold.dark
+        : challengeKind === 'sadaqa'
+          ? Colors.palette.semantic.success
+          : Colors.palette.purple.primary;
+
+  const handlePrimaryAction = async () => {
+    try {
+      if (challengeKind === 'quran') {
+        const firstSurah = quranPlanToday?.surahs?.[0];
+        if (firstSurah) {
+          const meta = SURAHS.find((s) => s.number === firstSurah);
+          router.push({
+            pathname: '/quran/french-reader',
+            params: {
+              chapterId: String(firstSurah),
+              chapterName: meta?.transliteration ?? `Surah ${firstSurah}`,
+              challengeLevelId: levelId,
+              challengeRequiredSurahs: (quranPlanToday?.surahs ?? []).join(','),
+            },
+          });
+          return;
+        }
+        router.push('/quran');
+        return;
+      }
+
+      if (challengeKind === 'salat_obligatoire') {
+        router.push('/(tabs)/salat');
+        return;
+      }
+
+      if (challengeKind === 'sadaqa') {
+        const items = sadaqaPlanToday?.items ?? [];
+        const message =
+          items.length > 0
+            ? `Sadaqa du jour (الصدقة)\n\n${items.map((i) => `- ${i}`).join('\n')}\n\nAlhamdulillah.`
+            : `Aujourd'hui, je fais une sadaqa (الصدقة).`;
+
+        await Share.share({ message });
+      }
+    } catch (error) {
+      console.error('Primary action failed:', error);
+    }
+  };
 
 
   // --- Views for each Tab ---
 
   const ContentView = () => (
-    <Animated.View entering={SlideInRight} style={styles.tabContent}>
-       <View style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: 'rgba(0,0,0,0.05)', borderWidth: 1 }]}>
-          <Text style={[styles.actionTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
-             Lecture du jour
-          </Text>
+    <Animated.View entering={SlideInRight} style={[styles.tabContent, { flex: 1 }]}>
+      <View style={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 12, gap: 16 }}>
+        <View style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}>
+          <Text style={[styles.actionTitle, { fontFamily: fontBold, color: colors.text.primary }]}>{actionTitle}</Text>
           <Text style={[styles.actionDesc, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-             Sourate Al-Baqarah, Versets 1-10
+            {level?.description || 'Votre objectif du jour est prêt.'}
           </Text>
-          
-          <Pressable 
-            style={[styles.primaryButton, { backgroundColor: Colors.palette.purple.primary }]}
-            onPress={() => router.push('/quran')}
-          >
-             <Ionicons name="book-outline" size={20} color="#FFF" />
-             <Text style={[styles.primaryButtonText, { fontFamily: fontBold }]}>Lire le Coran</Text>
-          </Pressable>
-       </View>
 
-       <View style={[styles.statusCard, { backgroundColor: colors.surface }]}>
+          <Pressable style={[styles.primaryButton, { backgroundColor: actionColor }]} onPress={handlePrimaryAction}>
+            <Ionicons name={actionIconName} size={20} color="#FFF" />
+            <Text style={[styles.primaryButtonText, { fontFamily: fontBold }]}>{actionButtonLabel}</Text>
+          </Pressable>
+        </View>
+
+        <View style={[styles.statusCard, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}>
           <Text style={[styles.statusTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
-             Statut d'aujourd'hui
+            {"Statut d’aujourd’hui"}
           </Text>
-           <Pressable 
+          {challengeKind === 'quran' ? (
+            <View
               style={[
-                styles.checkButton, 
-                { 
-                  borderColor: isDone ? Colors.palette.semantic.success : Colors.palette.gold.primary,
-                  backgroundColor: isDone ? 'rgba(76, 175, 80, 0.1)' : 'transparent'
-                }
+                styles.quranStatusBox,
+                {
+                  borderColor:
+                    quranTodayStatus?.completedToday || dashboard?.doneToday
+                      ? Colors.palette.semantic.success
+                      : colors.border,
+                  backgroundColor:
+                    quranTodayStatus?.completedToday || dashboard?.doneToday
+                      ? 'rgba(76, 175, 80, 0.1)'
+                      : colors.surfaceHighlight,
+                },
               ]}
-              onPress={() => setIsDone(!isDone)}
-           >
-               <Text style={[
-                  styles.checkText, 
-                  { 
-                    fontFamily: fontMedium, 
-                    color: isDone ? Colors.palette.semantic.success : colors.text.secondary 
+            >
+              <View style={styles.quranStatusTop}>
+                <Ionicons
+                  name={
+                    quranTodayStatus?.completedToday || dashboard?.doneToday
+                      ? 'checkmark-circle'
+                      : 'book-outline'
                   }
-               ]}>
-                  {isDone ? "Terminé, Mash'Allah ! ✅" : "Marquer comme terminé"}
-               </Text>
-           </Pressable>
-       </View>
+                  size={18}
+                  color={
+                    quranTodayStatus?.completedToday || dashboard?.doneToday
+                      ? Colors.palette.semantic.success
+                      : colors.text.secondary
+                  }
+                />
+                <Text
+                  style={[
+                    styles.quranStatusText,
+                    {
+                      fontFamily: fontMedium,
+                      color:
+                        quranTodayStatus?.completedToday || dashboard?.doneToday
+                          ? Colors.palette.semantic.success
+                          : colors.text.secondary,
+                    },
+                  ]}
+                >
+                  {quranTodayStatus
+                    ? `${quranTodayStatus.readCount}/${quranTodayStatus.requiredCount} sourates lues`
+                    : 'Progression de lecture en cours...'}
+                </Text>
+              </View>
+              <Text style={[styles.quranStatusHint, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+                {quranTodayStatus?.completedToday || dashboard?.doneToday
+                  ? "Objectif validé automatiquement. Qu’Allah accepte."
+                  : 'La validation se fait automatiquement après lecture complète des sourates du jour.'}
+              </Text>
+            </View>
+          ) : (
+            <Pressable
+              style={[
+                styles.checkButton,
+                {
+                  borderColor: dashboard?.doneToday ? Colors.palette.semantic.success : Colors.palette.gold.primary,
+                  backgroundColor: dashboard?.doneToday ? 'rgba(76, 175, 80, 0.1)' : 'transparent',
+                },
+              ]}
+              onPress={async () => {
+                try {
+                  if (!levelId) return;
+                  const result = await challengeDetailsService.toggleTodayCompletion(levelId);
+
+                  if (result.autoAdvancedToNextLevel) {
+                    const message = result.nextLevelTitle
+                      ? `Niveau débloqué: ${result.nextLevelTitle}`
+                      : 'Nouveau niveau débloqué.';
+                    toast.show({ message, type: 'success' });
+                    setAdvanceBadge({
+                      message,
+                      nextLevelId: result.nextLevelId,
+                      challengeCompleted: false,
+                    });
+                  } else if (result.challengeCompleted && result.doneToday) {
+                    const message = 'MashaAllah, vous avez terminé ce challenge.';
+                    toast.show({ message, type: 'success' });
+                    setAdvanceBadge({
+                      message,
+                      challengeCompleted: true,
+                    });
+                  }
+
+                  await load();
+                } catch (error) {
+                  console.error('Failed to toggle completion:', error);
+                }
+              }}
+            >
+              <Text
+                style={[
+                  styles.checkText,
+                  {
+                    fontFamily: fontMedium,
+                    color: dashboard?.doneToday ? Colors.palette.semantic.success : colors.text.secondary,
+                  },
+                ]}
+              >
+                {dashboard?.doneToday ? "Terminé, Mash'Allah ! ✅" : 'Marquer comme terminé'}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      </View>
+
+      <View style={{ flex: 1, paddingBottom: insets.bottom + 12 }}>
+        <ContentTab challengeSlug={challengeKind} levelId={levelId} />
+      </View>
     </Animated.View>
   );
 
@@ -116,7 +397,7 @@ export default function LevelDashboardScreen() {
 
     const animatedStyle = useAnimatedStyle(() => ({
         height: height.value,
-        backgroundColor: full ? Colors.palette.purple.primary : (value > 0 ? Colors.palette.gold.primary : colors.surfaceHighlight)
+        backgroundColor: full ? actionColor : (value > 0 ? Colors.palette.gold.primary : colors.surfaceHighlight)
     }));
 
     return (
@@ -141,7 +422,7 @@ export default function LevelDashboardScreen() {
             </Text>
             
             <View style={styles.chartContainer}>
-                {DASHBOARD_DATA.weeklyActivity.map((day, index) => (
+                {(dashboard?.weeklyActivity || []).map((day, index) => (
                     <Bar 
                         key={index} 
                         index={index}
@@ -155,10 +436,10 @@ export default function LevelDashboardScreen() {
             </View>
 
             {/* Tooltip / Info for selected day */}
-            {selectedDay !== null && (
+            {selectedDay !== null && dashboard?.weeklyActivity?.[selectedDay] && (
                 <Animated.View entering={FadeIn} style={[styles.dayInfo, { backgroundColor: colors.surfaceHighlight }]}>
                     <Text style={[styles.dayInfoText, { fontFamily: fontMedium, color: colors.text.primary }]}>
-                        {DASHBOARD_DATA.weeklyActivity[selectedDay].day}: {DASHBOARD_DATA.weeklyActivity[selectedDay].value} pages lues
+                        {dashboard.weeklyActivity[selectedDay].day}: {dashboard.weeklyActivity[selectedDay].value} {activityUnitLabel}
                     </Text>
                 </Animated.View>
             )}
@@ -167,19 +448,24 @@ export default function LevelDashboardScreen() {
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
              <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
-                <Ionicons name="book" size={24} color={Colors.palette.purple.primary} style={{ marginBottom: 8 }} />
+                <Ionicons
+                  name={challengeKind === 'quran' ? 'book' : challengeKind === 'salat_obligatoire' ? 'time' : challengeKind === 'sadaqa' ? 'heart' : 'checkmark-circle'}
+                  size={24}
+                  color={actionColor}
+                  style={{ marginBottom: 8 }}
+                />
                 <Text style={[styles.statValue, { fontFamily: fontBold, color: colors.text.primary }]}>
-                   {DASHBOARD_DATA.totalRead}
+                   {dashboard?.totalRead ?? 0}
                 </Text>
                 <Text style={[styles.statLabel, { fontFamily: fontMedium, color: colors.text.secondary }]}>
-                   Pages Totales
+                   {challengeKind === 'quran' ? 'Pages Totales' : 'Actions Totales'}
                 </Text>
              </View>
 
              <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
                 <Ionicons name="flame" size={24} color={Colors.palette.gold.primary} style={{ marginBottom: 8 }} />
                 <Text style={[styles.statValue, { fontFamily: fontBold, color: colors.text.primary }]}>
-                   {DASHBOARD_DATA.streak} j
+                   {dashboard?.streak ?? 0} j
                 </Text>
                 <Text style={[styles.statLabel, { fontFamily: fontMedium, color: colors.text.secondary }]}>
                    Série Actuelle
@@ -189,10 +475,10 @@ export default function LevelDashboardScreen() {
              <View style={[styles.statCard, { backgroundColor: colors.surface, flexBasis: '100%', flexDirection: 'column', alignItems: 'center' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%', justifyContent: 'center' }}>
                      <View style={{ height: 8, flex: 1, backgroundColor: colors.surfaceHighlight, borderRadius: 4, overflow: 'hidden' }}>
-                         <View style={{ width: `${DASHBOARD_DATA.completionRate}%`, height: '100%', backgroundColor: Colors.palette.semantic.success }} />
+                         <View style={{ width: `${dashboard?.completionRate ?? 0}%`, height: '100%', backgroundColor: Colors.palette.semantic.success }} />
                      </View>
                      <Text style={[styles.statValue, { fontFamily: fontBold, color: colors.text.primary, fontSize: 18 }]}>
-                        {DASHBOARD_DATA.completionRate}%
+                        {dashboard?.completionRate ?? 0}%
                      </Text>
                 </View>
                 <Text style={[styles.statLabel, { fontFamily: fontMedium, color: colors.text.secondary, marginTop: 8 }]}>
@@ -209,26 +495,24 @@ export default function LevelDashboardScreen() {
        <Text style={[styles.sectionHeader, { fontFamily: fontBold, color: colors.text.primary }]}>
          Classement du Groupe
        </Text>
-       {[1, 2, 3].map((item, index) => (
-          <View key={index} style={[styles.memberRow, { backgroundColor: colors.surface }]}>
-             <View style={styles.memberAvatar}>
-                <Text>{['🥇','🥈','🥉'][index]}</Text>
-             </View>
-             <View style={{ flex: 1 }}>
-                <Text style={{ fontFamily: fontBold, color: colors.text.primary }}>Utilisateur {item}</Text>
-                <Text style={{ fontFamily: fontRegular, color: colors.text.secondary }}>{100 - index * 10} points</Text>
-             </View>
-          </View>
-       ))}
+       <View style={[styles.memberRow, { backgroundColor: colors.surface }]}>
+         <View style={styles.memberAvatar}>
+           <Text>—</Text>
+         </View>
+         <View style={{ flex: 1 }}>
+           <Text style={{ fontFamily: fontBold, color: colors.text.primary }}>Bientôt disponible</Text>
+           <Text style={{ fontFamily: fontRegular, color: colors.text.secondary }}>
+             Le classement de groupe arrivera dans une prochaine version.
+           </Text>
+         </View>
+       </View>
     </Animated.View>
   );
 
   const DetailsView = () => (
      <Animated.View entering={SlideInRight} style={styles.tabContent}>
         <Text style={[styles.detailText, { fontFamily: fontRegular, color: colors.text.primary }]}>
-           Ce niveau consiste à lire régulièrement 2 pages de Coran après chaque prière.
-           {"\n\n"}
-           Récompense: Badge "Lecteur Assidu".
+           {level?.description || 'Détails du niveau indisponibles pour le moment.'}
         </Text>
      </Animated.View>
   );
@@ -239,57 +523,86 @@ export default function LevelDashboardScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top, backgroundColor: Colors.palette.purple.primary }]}>
+      <View style={[styles.header, { paddingTop: insets.top, backgroundColor: actionColor }]}>
         <View style={styles.headerTop}>
             <Pressable onPress={() => router.navigate({
               pathname: '/challenge-details/[id]',
-              params: { id: challengeId as string }
+              params: { id: challengeKind }
             })} style={styles.backButton}>
                  <Ionicons name="arrow-back" size={24} color="#FFF" />
             </Pressable>
-            <Text style={[styles.headerTitle, { fontFamily: fontBold }]}>Niveau {id}</Text>
-            {challengeId === '1' ? (
-               <Pressable onPress={() => router.push({
-                 pathname: '/challenge-details/config',
-                 params: { challengeId: challengeId as string, levelId: id as string }
-               })} style={styles.backButton}>
-                  <Ionicons name="settings-outline" size={24} color="#FFF" />
-               </Pressable>
-            ) : (
-               <View style={{ width: 40 }} />
-            )}
+            <Text style={[styles.headerTitle, { fontFamily: fontBold }]}>{level?.title || 'Niveau'}</Text>
+            <Pressable onPress={() => router.push({
+              pathname: '/challenge-details/config',
+              params: { challengeSlug: challengeKind, levelId: levelId }
+            })} style={styles.backButton}>
+              <Ionicons name="settings-outline" size={24} color="#FFF" />
+            </Pressable>
         </View>
 
         {/* Level Stats Summary */}
         <View style={styles.summaryContainer}>
             <View style={styles.summaryItem}>
                <Text style={[styles.summaryEmoji]}>🔥</Text>
-               <Text style={[styles.summaryValue, { fontFamily: fontBold }]}>{DASHBOARD_DATA.streak}</Text>
+               <Text style={[styles.summaryValue, { fontFamily: fontBold }]}>{dashboard?.streak ?? 0}</Text>
                <Text style={[styles.summaryLabel, { fontFamily: fontRegular }]}>Jours streak</Text>
             </View>
             <View style={styles.verticalDivider} />
             <View style={styles.summaryItem}>
                <Text style={[styles.summaryEmoji]}>⏳</Text>
-               <Text style={[styles.summaryValue, { fontFamily: fontBold }]}>{DASHBOARD_DATA.daysLeft}</Text>
+               <Text style={[styles.summaryValue, { fontFamily: fontBold }]}>{dashboard?.daysLeft ?? 0}</Text>
                <Text style={[styles.summaryLabel, { fontFamily: fontRegular }]}>Jours restants</Text>
             </View>
         </View>
+
+        {advanceBadge ? (
+          <Pressable
+            style={styles.advanceBadge}
+            onPress={() => {
+              if (advanceBadge.nextLevelId) {
+                router.replace({
+                  pathname: '/challenge-details/level/[id]',
+                  params: { id: advanceBadge.nextLevelId, challengeSlug: challengeKind },
+                });
+              }
+              setAdvanceBadge(null);
+            }}
+          >
+            <Ionicons
+              name={advanceBadge.challengeCompleted ? 'trophy' : 'ribbon'}
+              size={16}
+              color="#FFF"
+            />
+            <Text style={[styles.advanceBadgeText, { fontFamily: fontMedium }]}>
+              {advanceBadge.message}
+            </Text>
+            {advanceBadge.nextLevelId ? (
+              <Text style={[styles.advanceBadgeAction, { fontFamily: fontBold }]}>Ouvrir</Text>
+            ) : (
+              <Ionicons name="close" size={16} color="rgba(255,255,255,0.9)" />
+            )}
+          </Pressable>
+        ) : null}
       </View>
 
       {/* Tabs */}
       <View style={[styles.tabsContainer, { backgroundColor: colors.surface, shadowColor: '#000' }]}>
           {(['content', 'progression', 'group', 'details'] as DashboardTab[]).map((tab) => {
              const isActive = activeTab === tab;
+             const contentIcon =
+               challengeKind === 'quran' ? 'book' : challengeKind === 'salat_obligatoire' ? 'time' : challengeKind === 'sadaqa' ? 'heart' : 'book';
              const icons: Record<string, any> = {
-                content: 'book',
+                content: contentIcon,
                 progression: 'stats-chart',
                 group: 'people',
                 details: 'information-circle'
              };
              
              // Custom Labels
+             const contentLabel =
+               challengeKind === 'quran' ? 'Coran' : challengeKind === 'salat_obligatoire' ? 'Salat' : challengeKind === 'sadaqa' ? 'Sadaqa' : 'Contenu';
              const labels: Record<string, string> = {
-                content: 'Coran',
+                content: contentLabel,
                 progression: 'Stats',
                 group: 'Groupe',
                 details: 'Infos'
@@ -304,30 +617,54 @@ export default function LevelDashboardScreen() {
                   <Ionicons 
                      name={isActive ? icons[tab] : icons[tab] + '-outline'} 
                      size={22} 
-                     color={isActive ? Colors.palette.purple.primary : colors.text.secondary} 
+                     color={isActive ? actionColor : colors.text.secondary} 
                   />
                   <Text style={[
                      styles.tabLabel, 
-                     { fontFamily: isActive ? fontBold : fontMedium, color: isActive ? Colors.palette.purple.primary : colors.text.secondary }
+                     { fontFamily: isActive ? fontBold : fontMedium, color: isActive ? actionColor : colors.text.secondary }
                   ]}>
                      {labels[tab]}
                   </Text>
-                  {isActive && <View style={[styles.activeIndicator, { backgroundColor: Colors.palette.purple.primary }]} />}
+                  {isActive && <View style={[styles.activeIndicator, { backgroundColor: actionColor }]} />}
                </Pressable>
              );
           })}
       </View>
 
       {/* Content Area */}
-      <ScrollView 
-         contentContainerStyle={[styles.contentArea, { paddingBottom: insets.bottom + 20 }]}
-         showsVerticalScrollIndicator={false}
-      >
-         {activeTab === 'content' && <ContentView />}
-         {activeTab === 'progression' && <ProgressionView />}
-         {activeTab === 'group' && <GroupView />}
-         {activeTab === 'details' && <DetailsView />}
-      </ScrollView>
+      {activeTab === 'content' ? (
+        <View style={{ flex: 1 }}>
+          {isLoading ? (
+            <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+              <ActivityIndicator size="large" color={actionColor} />
+            </View>
+          ) : loadError ? (
+            <View style={{ paddingVertical: 24, paddingHorizontal: 20 }}>
+              <Text style={{ fontFamily: fontBold, color: colors.text.primary }}>{loadError}</Text>
+            </View>
+          ) : null}
+
+          {!loadError ? <ContentView /> : null}
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={[styles.contentArea, { paddingBottom: insets.bottom + 20 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {isLoading ? (
+            <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+              <ActivityIndicator size="large" color={actionColor} />
+            </View>
+          ) : loadError ? (
+            <View style={{ paddingVertical: 24 }}>
+              <Text style={{ fontFamily: fontBold, color: colors.text.primary }}>{loadError}</Text>
+            </View>
+          ) : null}
+          {activeTab === 'progression' && <ProgressionView />}
+          {activeTab === 'group' && <GroupView />}
+          {activeTab === 'details' && <DetailsView />}
+        </ScrollView>
+      )}
 
 
     </View>
@@ -367,6 +704,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-evenly',
     alignItems: 'center',
+  },
+  advanceBadge: {
+    marginTop: 14,
+    marginHorizontal: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  advanceBadgeText: {
+    flex: 1,
+    color: '#FFF',
+    fontSize: 12,
+  },
+  advanceBadgeAction: {
+    color: '#FFF',
+    fontSize: 12,
   },
   summaryItem: {
     alignItems: 'center',
@@ -484,6 +843,24 @@ const styles = StyleSheet.create({
   checkText: {
     fontSize: 14,
   },
+  quranStatusBox: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    gap: 6,
+  },
+  quranStatusTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  quranStatusText: {
+    fontSize: 14,
+  },
+  quranStatusHint: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
   // Stats Styles
   chartCard: {
     padding: 20,
@@ -575,5 +952,3 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
-
-

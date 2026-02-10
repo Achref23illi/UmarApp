@@ -1,4 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,9 +18,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Images } from '@/config/assets';
 import { Fonts } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
+import { socialService } from '@/services/socialService';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { loadUser } from '@/store/slices/userSlice';
 
@@ -35,11 +39,30 @@ export default function EditProfileScreen() {
   const [age, setAge] = useState(user.age ? user.age.toString() : '');
   const [phone, setPhone] = useState(user.phone_number || '');
   const [gender, setGender] = useState<'male' | 'female' | null>(user.gender);
+  const [coverUri, setCoverUri] = useState<string | null>(null);
 
   const fontRegular = Fonts.regular;
   const fontMedium = Fonts.medium;
   const fontSemiBold = Fonts.semiBold;
   const fontBold = Fonts.bold;
+
+  const pickCover = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [3, 1],
+        quality: 0.85,
+      });
+
+      if (!result.canceled) {
+        setCoverUri(result.assets[0].uri);
+      }
+    } catch (e) {
+      console.error('pickCover error:', e);
+      Alert.alert('Error', 'Unable to pick image');
+    }
+  };
 
   const handleSave = async () => {
     if (!name) {
@@ -49,12 +72,22 @@ export default function EditProfileScreen() {
 
     setIsLoading(true);
     try {
+      let coverUrl = user.cover_url || null;
+      if (coverUri) {
+        const uploaded = await socialService.uploadImage(coverUri);
+        if (!uploaded) {
+          throw new Error('Cover upload failed');
+        }
+        coverUrl = uploaded;
+      }
+
       const updates = {
         id: user.id,
         full_name: name,
         age: age ? parseInt(age) : null,
         phone_number: phone,
         gender: gender,
+        cover_url: coverUrl,
         updated_at: new Date(),
       };
 
@@ -104,6 +137,25 @@ export default function EditProfileScreen() {
         style={styles.flex}
       >
         <ScrollView contentContainerStyle={styles.content}>
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { fontFamily: fontMedium, color: colors.text.secondary }]}>
+              Cover Photo
+            </Text>
+
+            <Pressable onPress={pickCover} style={styles.coverWrapper}>
+              <Image
+                source={coverUri ? { uri: coverUri } : user.cover_url ? { uri: user.cover_url } : Images.welcomeBackground}
+                style={styles.coverImage}
+                contentFit="cover"
+              />
+              <View style={[styles.coverOverlay, { backgroundColor: 'rgba(0,0,0,0.35)' }]}>
+                <Ionicons name="camera-outline" size={18} color="#fff" />
+                <Text style={[styles.coverOverlayText, { fontFamily: fontMedium, color: '#fff' }]}>
+                  Change
+                </Text>
+              </View>
+            </Pressable>
+          </View>
           
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { fontFamily: fontMedium, color: colors.text.secondary }]}>
@@ -226,6 +278,30 @@ const styles = StyleSheet.create({
   },
   inputGroup: {
     gap: 8,
+  },
+  coverWrapper: {
+    width: '100%',
+    height: 140,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  coverImage: {
+    width: '100%',
+    height: '100%',
+  },
+  coverOverlay: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 999,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  coverOverlayText: {
+    fontSize: 13,
   },
   label: {
     fontSize: 15,

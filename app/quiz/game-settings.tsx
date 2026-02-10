@@ -47,7 +47,7 @@ export default function GameSettingsScreen() {
     router.push({
       pathname: '/quiz/game',
       params: {
-        theme: theme || 'Histoire',
+        theme: theme || 'random',
         level: level || 'intermediaire',
         responseTime: settings.responseTime.toString(),
         numberOfQuestions: settings.numberOfQuestions.toString(),

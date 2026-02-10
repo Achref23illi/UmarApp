@@ -25,12 +25,12 @@ const LEVELS = [
 ];
 
 const THEMES = [
-  { id: 'prophete', labelKey: 'quiz.themes.prophethood', icon: 'book-outline' },
-  { id: 'musulmans', labelKey: 'quiz.themes.companions', icon: 'people-outline' },
-  { id: 'coran', labelKey: 'quiz.themes.quran', icon: 'book-outline' },
-  { id: 'sunna', labelKey: 'quiz.themes.sunnah', icon: 'sunny-outline' },
+  { id: 'prophethood', labelKey: 'quiz.themes.prophethood', icon: 'book-outline' },
+  { id: 'companions', labelKey: 'quiz.themes.companions', icon: 'people-outline' },
+  { id: 'quran', labelKey: 'quiz.themes.quran', icon: 'book-outline' },
+  { id: 'sunnah', labelKey: 'quiz.themes.sunnah', icon: 'sunny-outline' },
   { id: 'ramadan', labelKey: 'quiz.themes.ramadan', icon: 'moon-outline' },
-  { id: 'piliers', labelKey: 'quiz.themes.pillars', icon: 'list-outline' },
+  { id: 'pillars', labelKey: 'quiz.themes.pillars', icon: 'list-outline' },
   { id: 'random', labelKey: 'quiz.themes.random', icon: 'shuffle-outline' },
 ];
 

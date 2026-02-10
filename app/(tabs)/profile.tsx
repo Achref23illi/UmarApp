@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { InfiniteFeed } from '@/components/feed/InfiniteFeed';
+import { Images } from '@/config/assets';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -34,8 +35,7 @@ export default function ProfileScreen() {
     const fontBold = getFont(currentLanguage, 'bold');
     const fontSemiBold = getFont(currentLanguage, 'semiBold');
 
-    // Default cover image if none provided
-    const coverImage = "https://images.unsplash.com/photo-1542831371-29b0f74f9713?q=80&w=2070&auto=format&fit=crop";
+    const coverSource = userData.cover_url ? { uri: userData.cover_url } : Images.welcomeBackground;
 
     const handleSignOut = async () => {
         await dispatch(logoutUser());
@@ -48,7 +48,7 @@ export default function ProfileScreen() {
             {/* Cover Image */}
             <View style={styles.coverContainer}>
                 <Image 
-                    source={{ uri: coverImage }} 
+                    source={coverSource} 
                     style={styles.coverImage} 
                     contentFit="cover"
                 />
