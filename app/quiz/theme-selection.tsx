@@ -46,7 +46,7 @@ export default function ThemeSelectionScreen() {
     setShowConfirmation(false);
     router.push({
       pathname: '/quiz/game-settings',
-      params: { theme: selectedTheme || '', level: level || '' }
+      params: { theme: selectedThemeKey || '', level: level || '' }
     });
   };
 

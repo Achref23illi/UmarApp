@@ -1,78 +1,108 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
 import ActiveChallengeCard from './ActiveChallengeCard';
-import GroupCard from './GroupCard';
 import CompletedChallengeCard from './CompletedChallengeCard';
+import { challengeDetailsService } from '@/services/challengeDetailsService';
+import { ChallengeCategory } from '@/services/challengeService';
+import { useTheme } from '@/hooks/use-theme';
+import { getFont } from '@/hooks/use-fonts';
+import { useAppSelector } from '@/store/hooks';
 
-const { width } = Dimensions.get('window');
+const BG_IMAGE = require('@/assets/images/bg-wa.jpg');
 
-// Placeholder images - in real app use proper assets
-const BG_IMAGE = require('@/assets/images/bg-wa.jpg'); 
-// Using same image for demo purposes, should be varied
-const DEMO_IMAGE_1 = require('@/assets/images/bg-wa.jpg'); 
-const DEMO_IMAGE_2 = require('@/assets/images/bg-wa.jpg');
+type Props = { onSwitchToChallenges?: () => void };
 
-export default function MyChallengesView() {
+export default function MyChallengesView({ onSwitchToChallenges }: Props) {
+  const router = useRouter();
+  const { colors } = useTheme();
+  const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
+  const fontBold = getFont(currentLanguage, 'bold');
+
+  const [active, setActive] = useState<Array<{ level: { id: string; title: string; durationDays: number }; category: ChallengeCategory; progress: number }>>([]);
+  const [completed, setCompleted] = useState<Array<{ level: { id: string; title: string }; category: ChallengeCategory; completedAt?: string }>>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadMyChallenges = useCallback(async () => {
+    try {
+      setLoading(true);
+      const result = await challengeDetailsService.getMyChallenges();
+      setActive(result.active);
+      setCompleted(result.completed);
+    } catch (error) {
+      console.error('Failed to load my challenges:', error);
+      setActive([]);
+      setCompleted([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMyChallenges();
+  }, [loadMyChallenges]);
+
+  if (loading) {
+    return (
+      <View style={[styles.emptyState, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  const hasAny = active.length > 0 || completed.length > 0;
+  if (!hasAny) {
+    return (
+      <View style={[styles.emptyState, { backgroundColor: colors.background }]}>
+        <Text style={[styles.emptyText, { color: colors.text.primary }]}>Aucun challenge en cours</Text>
+        <Text style={[styles.emptySubText, { color: colors.text.secondary }]}>
+          Commencez un challenge depuis l’onglet Challenge pour le retrouver ici.
+        </Text>
+        <Pressable
+          onPress={onSwitchToChallenges}
+          style={{ marginTop: 16, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.primary }}
+        >
+          <Text style={{ color: '#fff', fontFamily: fontBold }}>Voir les challenges</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Featured / Active Challenge */}
-      <View style={styles.section}>
-        <ActiveChallengeCard
-          title="AS SALAT"
-          duration="5 semaines"
-          levels="3 niveaux"
-          prerequisite="Aucun"
-          imageSource={BG_IMAGE}
-        />
-        {/* Pagination dots simulation */}
-        <View style={styles.dotsContainer}>
-          <View style={[styles.dot, styles.activeDot]} />
-          <View style={styles.dot} />
-          <View style={styles.dot} />
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
+      {active.length > 0 && (
+        <View style={styles.section}>
+          {active.map(({ level, category, progress }) => (
+            <Pressable key={level.id} onPress={() => router.push(`/challenge-details/level/${level.id}`)}>
+              <ActiveChallengeCard
+                title={category.title}
+                duration={category.duration}
+                levels={category.levels}
+                prerequisite={category.prerequisite}
+                imageSource={category.imageUrl ? { uri: category.imageUrl } : BG_IMAGE}
+              />
+            </Pressable>
+          ))}
         </View>
-      </View>
+      )}
 
-      {/* My Groups */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Mes groupes</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-          <GroupCard title="Objectif firdaws" imageSource={DEMO_IMAGE_1} />
-          <GroupCard title="Coran" imageSource={DEMO_IMAGE_2} />
-          <GroupCard title="Jeûne" imageSource={DEMO_IMAGE_1} />
-        </ScrollView>
-      </View>
-
-      {/* Completed Challenges */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Challenges terminés</Text>
-        <View style={styles.grid}>
-           <CompletedChallengeCard
-              title="Prier à l'heure"
-              date="27 Avril 2019"
-              progress={100}
-              imageSource={DEMO_IMAGE_2}
-           />
-           <CompletedChallengeCard
-              title="Salat al Fajr"
-              date="27 Avril 2019"
-              progress={91}
-              imageSource={DEMO_IMAGE_1}
-           />
-           <CompletedChallengeCard
-              title="Lecture Coran"
-              date="15 Mai 2019"
-              progress={100}
-              imageSource={DEMO_IMAGE_2}
-           />
-           <CompletedChallengeCard
-              title="Sadaqa"
-              date="01 Juin 2019"
-              progress={85}
-              imageSource={DEMO_IMAGE_1}
-           />
+      {completed.length > 0 && (
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>Challenges terminés</Text>
+          <View style={styles.grid}>
+            {completed.map(({ level, category, completedAt }) => (
+              <CompletedChallengeCard
+                key={level.id}
+                title={category.title}
+                date={completedAt ? new Date(completedAt).toLocaleDateString('fr-FR') : '—'}
+                progress={100}
+                imageSource={category.imageUrl ? { uri: category.imageUrl } : BG_IMAGE}
+              />
+            ))}
+          </View>
         </View>
-      </View>
-      
+      )}
+
       <View style={{ height: 20 }} />
     </ScrollView>
   );
@@ -88,36 +118,28 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontFamily: 'Metropolis-Bold',
-    color: '#1F2937',
     marginBottom: 12,
     paddingHorizontal: 20,
-  },
-  horizontalScroll: {
-    paddingHorizontal: 20,
-  },
-  dotsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 8,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#E5E7EB',
-  },
-  activeDot: {
-    backgroundColor: '#7C3AED', // Purple
-    width: 24, // Elongated active dot
-    height: 8,
-    borderRadius: 4,
-    marginTop: 0,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingHorizontal: 16,
     justifyContent: 'space-between',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  emptySubText: {
+    fontSize: 14,
+    textAlign: 'center',
   },
 });

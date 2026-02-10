@@ -616,6 +616,22 @@ apiRouter.post('/upload', verifyToken, upload.single('image'), (req, res) => {
 // Mount API Router
 app.use('/api', apiRouter);
 
+// --- Challenge Categories ---
+app.get('/api/challenge-categories', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('challenge_categories')
+      .select('*')
+      .order('sort_order', { ascending: true });
+
+    if (error) throw error;
+    res.json(data || []);
+  } catch (error) {
+    console.error('Error fetching challenge categories:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // --- Mosque Management Endpoints ---
 
 // Get all mosques (curated)

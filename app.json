@@ -12,7 +12,11 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.umarapp.dev",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "UmarApp needs your location to show accurate prayer times for your area."
+        "NSLocationWhenInUseUsageDescription": "UmarApp needs your location to show accurate prayer times for your area.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsLocalNetworking": true
+        }
       }
     },
     "android": {

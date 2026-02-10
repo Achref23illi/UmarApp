@@ -23,6 +23,7 @@ import { InfiniteFeed } from '@/components/feed/InfiniteFeed';
 import { PrayerBanner } from '@/components/prayer/PrayerBanner';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
+import { socialService } from '@/services/socialService';
 import { getReadingProgress, ReadingProgress } from '@/services/quranProgress';
 import { useAppSelector } from '@/store/hooks';
 
@@ -39,7 +40,7 @@ export default function HomeScreen() {
   const fontBold = getFont(currentLanguage, 'bold');
 
   const [locationCoords, setLocationCoords] = useState<{ lat: number; lng: number } | undefined>(undefined);
-  const [notificationCount, setNotificationCount] = useState(3); // TODO: Get from actual notifications
+  const [notificationCount, setNotificationCount] = useState(0);
   const [readingProgress, setReadingProgress] = useState<ReadingProgress | null>(null);
   const userData = useAppSelector((state) => state.user);
 
@@ -70,6 +71,34 @@ export default function HomeScreen() {
       };
       fetchProgress();
     }, [])
+  );
+
+  // Fetch unread notifications count when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      const fetchUnreadCount = async () => {
+        try {
+          if (!userData.isAuthenticated) {
+            if (isActive) setNotificationCount(0);
+            return;
+          }
+
+          const count = await socialService.getUnreadNotificationsCount();
+          if (isActive) setNotificationCount(count);
+        } catch (error) {
+          console.error('Failed to fetch unread notifications count:', error);
+          if (isActive) setNotificationCount(0);
+        }
+      };
+
+      fetchUnreadCount();
+
+      return () => {
+        isActive = false;
+      };
+    }, [userData.isAuthenticated])
   );
 
   const handleContinueReading = () => {

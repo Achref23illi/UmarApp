@@ -165,35 +165,19 @@ export default function MosquesScreen() {
 
     } catch (err) {
       console.error('Nominatim error:', err);
-      // Fallback: Generate sample mosques near user location for demo
-      const sampleMosques = generateSampleMosques(lat, lng);
-      setMosques(sampleMosques);
-      setFilteredMosques(sampleMosques);
-    }
-  };
+      // Fallback: show curated mosques only (no hardcoded samples)
+      const curated = await socialService.getMosques();
+      const curatedWithDistance = curated
+        .map((m: any) => ({
+          ...m,
+          distance: calculateDistance(lat, lng, m.latitude, m.longitude),
+        }))
+        .sort((a: any, b: any) => (a.distance || 0) - (b.distance || 0));
 
-  // Generate sample mosques for demo/fallback
-  const generateSampleMosques = (lat: number, lng: number): Mosque[] => {
-    const names = [
-      'Central Mosque', 'Al-Noor Mosque', 'Islamic Center', 
-      'Masjid Al-Rahman', 'Grand Mosque', 'Al-Huda Mosque',
-      'Baitul Mukarram', 'Masjid Al-Taqwa', 'Al-Iman Mosque'
-    ];
-    
-    return names.map((name, i) => {
-      const offsetLat = (Math.random() - 0.5) * 0.05;
-      const offsetLng = (Math.random() - 0.5) * 0.05;
-      const mosqueLat = lat + offsetLat;
-      const mosqueLng = lng + offsetLng;
-      
-      return {
-        id: `sample-${i}`,
-        name,
-        latitude: mosqueLat,
-        longitude: mosqueLng,
-        distance: calculateDistance(lat, lng, mosqueLat, mosqueLng),
-      };
-    }).sort((a, b) => (a.distance || 0) - (b.distance || 0));
+      setMosques(curatedWithDistance);
+      setFilteredMosques(curatedWithDistance);
+      setError(curatedWithDistance.length > 0 ? null : 'Unable to load mosques');
+    }
   };
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {

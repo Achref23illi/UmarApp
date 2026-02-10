@@ -5,10 +5,11 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -16,31 +17,8 @@ import { QuizBottomNav } from '@/components/quiz/QuizBottomNav';
 import { Colors } from '@/config/colors';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
+import { contactsService, InviteContact } from '@/services/contactsService';
 import { useAppSelector } from '@/store/hooks';
-
-// Mock contact data
-interface Contact {
-  id: string;
-  name: string;
-  avatar?: string;
-  lastConnection: string;
-}
-
-const RECENT_CONTACTS: Contact[] = [
-  { id: '1', name: 'Mounir B.', lastConnection: '16 septembre 2019' },
-  { id: '2', name: 'Mounir B.', lastConnection: '16 septembre 2019' },
-  { id: '3', name: 'Mounir B.', lastConnection: '16 septembre 2019' },
-  { id: '4', name: 'Mounir B.', lastConnection: '16 septembre 2019' },
-];
-
-const ALL_CONTACTS: Contact[] = [
-  { id: '5', name: 'Mounir Benacer', lastConnection: '16 septembre 2019' },
-  { id: '6', name: 'Mounir Benacer', lastConnection: '16 septembre 2019' },
-  { id: '7', name: 'Mounir Benacer', lastConnection: '16 septembre 2019' },
-  { id: '8', name: 'Mounir Benacer', lastConnection: '16 septembre 2019' },
-  { id: '9', name: 'Mounir Benacer', lastConnection: '16 septembre 2019' },
-  { id: '10', name: 'Mounir Benacer', lastConnection: '16 septembre 2019' },
-];
 
 export default function InviteContactsScreen() {
   const router = useRouter();
@@ -53,8 +31,48 @@ export default function InviteContactsScreen() {
   const fontMedium = getFont(currentLanguage, 'medium');
   const fontRegular = getFont(currentLanguage, 'regular');
 
+  const [recentContacts, setRecentContacts] = useState<InviteContact[]>([]);
+  const [allContacts, setAllContacts] = useState<InviteContact[]>([]);
+  const [isLoadingContacts, setIsLoadingContacts] = useState(true);
+  const [contactsError, setContactsError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
   const [selectedRecentContacts, setSelectedRecentContacts] = useState<Set<string>>(new Set());
   const [invitedContacts, setInvitedContacts] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadContacts = async () => {
+      try {
+        setIsLoadingContacts(true);
+        setContactsError(null);
+
+        const { recent, all } = await contactsService.getInviteContacts({
+          language: currentLanguage,
+        });
+
+        if (!isActive) return;
+        setRecentContacts(recent);
+        setAllContacts(all);
+      } catch (error) {
+        console.error('Failed to load contacts:', error);
+        if (!isActive) return;
+        setRecentContacts([]);
+        setAllContacts([]);
+        setContactsError(t('errors.networkError'));
+      } finally {
+        if (!isActive) return;
+        setIsLoadingContacts(false);
+      }
+    };
+
+    loadContacts();
+
+    return () => {
+      isActive = false;
+    };
+  }, [currentLanguage, t, reloadKey]);
 
   const toggleRecentContact = (id: string) => {
     const newSelected = new Set(selectedRecentContacts);
@@ -106,6 +124,30 @@ export default function InviteContactsScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
       >
+        {isLoadingContacts && recentContacts.length === 0 && allContacts.length === 0 ? (
+          <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={Colors.palette.purple.primary} />
+          </View>
+        ) : contactsError ? (
+          <View style={{ paddingVertical: 24, gap: 10 }}>
+            <Text style={{ fontFamily: fontBold, color: colors.text.primary }}>{t('errors.somethingWentWrong')}</Text>
+            <Text style={{ fontFamily: fontRegular, color: colors.text.secondary }}>{contactsError}</Text>
+            <Pressable
+              onPress={() => setReloadKey((k) => k + 1)}
+              style={{
+                marginTop: 8,
+                alignSelf: 'flex-start',
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                borderRadius: 12,
+                backgroundColor: Colors.palette.purple.primary,
+              }}
+            >
+              <Text style={{ fontFamily: fontMedium, color: '#fff' }}>{t('errors.tryAgain')}</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         {/* Add Button and Participants */}
         <View style={styles.topSection}>
           <Pressable
@@ -136,7 +178,7 @@ export default function InviteContactsScreen() {
             style={styles.recentContactsScroll}
             contentContainerStyle={styles.recentContactsContainer}
           >
-            {RECENT_CONTACTS.map((contact, index) => (
+            {recentContacts.map((contact, index) => (
               <Animated.View
                 key={contact.id}
                 entering={FadeInDown.delay(index * 50).springify()}
@@ -159,9 +201,13 @@ export default function InviteContactsScreen() {
                   </View>
                   
                   {/* Avatar */}
-                  <View style={[styles.avatarCircle, { backgroundColor: colors.surfaceHighlight || '#F3F4F6' }]}>
-                    <Ionicons name="person" size={24} color={colors.text.secondary} />
-                  </View>
+                  {contact.avatarUrl ? (
+                    <Image source={{ uri: contact.avatarUrl }} style={styles.avatarCircle} contentFit="cover" />
+                  ) : (
+                    <View style={[styles.avatarCircle, { backgroundColor: colors.surfaceHighlight || '#F3F4F6' }]}>
+                      <Ionicons name="person" size={24} color={colors.text.secondary} />
+                    </View>
+                  )}
                   
                   {/* Name */}
                   <Text style={[styles.recentContactName, { fontFamily: fontRegular, color: colors.text.primary }]} numberOfLines={1}>
@@ -180,16 +226,20 @@ export default function InviteContactsScreen() {
           </Text>
           
           <View style={styles.contactsList}>
-            {ALL_CONTACTS.map((contact, index) => (
+            {allContacts.map((contact, index) => (
               <Animated.View
                 key={contact.id}
                 entering={FadeInDown.delay(index * 30).springify()}
               >
                 <View style={[styles.contactCard, { backgroundColor: colors.surface, shadowColor: colors.text.primary }]}>
                   {/* Avatar */}
-                  <View style={[styles.contactAvatar, { backgroundColor: colors.surfaceHighlight || '#F3F4F6' }]}>
-                    <Ionicons name="person" size={24} color={colors.text.secondary} />
-                  </View>
+                  {contact.avatarUrl ? (
+                    <Image source={{ uri: contact.avatarUrl }} style={styles.contactAvatar} contentFit="cover" />
+                  ) : (
+                    <View style={[styles.contactAvatar, { backgroundColor: colors.surfaceHighlight || '#F3F4F6' }]}>
+                      <Ionicons name="person" size={24} color={colors.text.secondary} />
+                    </View>
+                  )}
                   
                   {/* Info */}
                   <View style={styles.contactInfo}>

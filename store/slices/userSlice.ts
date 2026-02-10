@@ -6,6 +6,7 @@ export interface UserState {
   name: string | null;
   email: string | null;
   avatar_url: string | null;
+  cover_url: string | null;
   age: number | null;
   gender: 'male' | 'female' | null;
   phone_number: string | null;
@@ -26,6 +27,7 @@ const initialState: UserState = {
   name: null,
   email: null,
   avatar_url: null,
+  cover_url: null,
   age: null,
   gender: null,
   phone_number: null,
@@ -167,6 +169,7 @@ export const userSlice = createSlice({
         state.email = action.payload.session.user.email || null;
         state.name = action.payload.profile?.full_name || null;
         state.avatar_url = action.payload.profile?.avatar_url || null;
+        state.cover_url = action.payload.profile?.cover_url || null;
         state.age = action.payload.profile?.age || null;
         state.gender = action.payload.profile?.gender || null;
         state.phone_number = action.payload.profile?.phone_number || null;
@@ -174,6 +177,7 @@ export const userSlice = createSlice({
       } else {
         state.isAuthenticated = false;
         state.token = null;
+        state.cover_url = null;
       }
     });
     builder.addCase(loadUser.rejected, (state, action) => {
@@ -195,6 +199,7 @@ export const userSlice = createSlice({
         state.email = action.payload.session.user.email || null;
         state.name = action.payload.profile?.full_name || null;
         state.avatar_url = action.payload.profile?.avatar_url || null;
+        state.cover_url = action.payload.profile?.cover_url || null;
         state.age = action.payload.profile?.age || null;
         state.gender = action.payload.profile?.gender || null;
         state.phone_number = action.payload.profile?.phone_number || null;
@@ -220,6 +225,7 @@ export const userSlice = createSlice({
             state.email = action.payload.session.user.email || null;
             state.name = action.payload.profile?.full_name || null;
             state.avatar_url = action.payload.profile?.avatar_url || null;
+            state.cover_url = action.payload.profile?.cover_url || null;
         } else {
             // Registration successful but no session (verification needed)
             state.isAuthenticated = false;
@@ -239,6 +245,7 @@ export const userSlice = createSlice({
         state.isAuthenticated = false;
         state.isAdmin = false;
         state.avatar_url = null;
+        state.cover_url = null;
         state.age = null;
         state.gender = null;
         state.phone_number = null;

@@ -1,17 +1,18 @@
 import { Colors } from '@/config/colors';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
+import { challengeDetailsService } from '@/services/challengeDetailsService';
 import { useAppSelector } from '@/store/hooks';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ChallengeConfigScreen() {
   const router = useRouter();
-  const { challengeId, levelId } = useLocalSearchParams();
+  const params = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   
@@ -19,6 +20,16 @@ export default function ChallengeConfigScreen() {
   const fontBold = getFont(currentLanguage, 'bold');
   const fontMedium = getFont(currentLanguage, 'medium');
   const fontRegular = getFont(currentLanguage, 'regular');
+
+  const levelId = useMemo(() => {
+    const raw = (params as any)?.levelId ?? (params as any)?.id;
+    return typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : '';
+  }, [params]);
+
+  const challengeSlug = useMemo(() => {
+    const raw = (params as any)?.challengeSlug ?? (params as any)?.challengeId;
+    return typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : '';
+  }, [params]);
 
   // State
   const [daysCount, setDaysCount] = useState(9);
@@ -30,6 +41,47 @@ export default function ChallengeConfigScreen() {
   const [notifications, setNotifications] = useState(true);
   const [reminders, setReminders] = useState(true);
   const [arabic, setArabic] = useState(true);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const load = async () => {
+      try {
+        setIsLoading(true);
+        setLoadError(null);
+
+        if (!levelId) return;
+
+        const settings = await challengeDetailsService.getSettingsForLevel(levelId);
+        if (!isActive) return;
+
+        setDaysCount(settings.daysCount);
+        setExercisesCount(settings.exercisesCount);
+        setDuration(settings.durationMinutes);
+        setSelectedDays(settings.selectedDays);
+        setNotifications(settings.notifications);
+        setReminders(settings.reminders);
+        setArabic(settings.arabic);
+      } catch (error) {
+        console.error('Failed to load challenge settings:', error);
+        if (!isActive) return;
+        setLoadError('Unable to load settings');
+      } finally {
+        if (!isActive) return;
+        setIsLoading(false);
+      }
+    };
+
+    load();
+
+    return () => {
+      isActive = false;
+    };
+  }, [levelId]);
 
   // Helper for counters
   const Counter = ({ value, setValue, min = 1 }: any) => (
@@ -51,10 +103,38 @@ export default function ChallengeConfigScreen() {
   );
 
   const handleStart = () => {
-    router.push({
-      pathname: '/challenge-details/level/[id]',
-      params: { id: levelId as string, challengeId: challengeId as string }
-    });
+    (async () => {
+      try {
+        if (!levelId) return;
+        setIsSaving(true);
+
+        const level = await challengeDetailsService.getLevelById(levelId);
+        if (!level) throw new Error('Level not found');
+
+        await challengeDetailsService.saveSettingsForLevel({
+          levelId,
+          categoryId: level.categoryId,
+          settings: {
+            daysCount,
+            exercisesCount,
+            durationMinutes: duration,
+            selectedDays,
+            notifications,
+            reminders,
+            arabic,
+          },
+        });
+
+        router.push({
+          pathname: '/challenge-details/level/[id]',
+          params: { id: levelId, challengeSlug },
+        });
+      } catch (error) {
+        console.error('Failed to start challenge:', error);
+      } finally {
+        setIsSaving(false);
+      }
+    })();
   };
 
   const DAYS = [
@@ -102,6 +182,16 @@ export default function ChallengeConfigScreen() {
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+              {isLoading ? (
+                <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                  <ActivityIndicator size="large" color="#FFF" />
+                </View>
+              ) : loadError ? (
+                <View style={{ paddingVertical: 24 }}>
+                  <Text style={[styles.label, { fontFamily: fontBold }]}>{loadError}</Text>
+                </View>
+              ) : null}
+
               {/* Days Count */}
               <View style={styles.row}>
                  <Text style={[styles.label, { fontFamily: fontMedium }]}>Sur combien de jour ?</Text>
@@ -160,30 +250,6 @@ export default function ChallengeConfigScreen() {
               </View>
               <View style={styles.divider} />
 
-               {/* Time Slots (Mocked) */}
-               <View style={styles.timeSlotRow}>
-                   <View style={styles.timeLabelContainer}>
-                        <Text style={[styles.dayName, { fontFamily: fontMedium }]}>Mardi</Text>
-                   </View>
-                   <View style={styles.timeValues}>
-                        <Text style={[styles.timeText, { fontFamily: fontRegular }]}>09 : 00</Text>
-                        <View style={styles.timeDivider} />
-                        <Text style={[styles.timeText, { fontFamily: fontRegular }]}>18 : 00</Text>
-                   </View>
-               </View>
-
-               <View style={styles.timeSlotRow}>
-                   <View style={styles.timeLabelContainer}>
-                        <Text style={[styles.dayName, { fontFamily: fontMedium }]}>Vendredi</Text>
-                   </View>
-                   <View style={styles.timeValues}>
-                        <Text style={[styles.timeText, { fontFamily: fontRegular }]}>09 : 00</Text>
-                        <View style={styles.timeDivider} />
-                        <Text style={[styles.timeText, { fontFamily: fontRegular }]}>18 : 00</Text>
-                   </View>
-               </View>
-               <View style={styles.divider} />
-
                {/* Toggles */}
                 <View style={[styles.row, { alignItems: 'center' }]}>
                    <View style={{ flex: 1 }}>
@@ -230,14 +296,14 @@ export default function ChallengeConfigScreen() {
            </ScrollView>
 
            <View style={{ padding: 20, alignItems: 'center', paddingBottom: insets.bottom + 20 }}>
-               <TouchableOpacity style={styles.startButton} onPress={handleStart}>
+               <TouchableOpacity style={[styles.startButton, isSaving && { opacity: 0.7 }]} onPress={handleStart} disabled={isSaving}>
                   <LinearGradient
                      colors={[Colors.palette.purple.primary, Colors.palette.purple.light]}
                      style={styles.startButtonGradient}
                      start={{ x: 0, y: 0 }}
                      end={{ x: 1, y: 0 }}
                   >
-                     <Text style={[styles.startButtonText, { fontFamily: fontBold }]}>Bismillah</Text>
+                     <Text style={[styles.startButtonText, { fontFamily: fontBold }]}>{isSaving ? '...' : 'Bismillah'}</Text>
                   </LinearGradient>
                </TouchableOpacity>
            </View>

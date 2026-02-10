@@ -8,30 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/config/colors';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
+import { GameQuizQuestion, quizService } from '@/services/quizService';
 import { useAppSelector } from '@/store/hooks';
-
-interface QuizQuestion {
-  id: string;
-  question: string;
-  options: string[];
-  correctAnswer: string;
-}
-
-// Mock questions for now - replace with actual data
-const mockQuestions: QuizQuestion[] = [
-  {
-    id: '1',
-    question: "Quels sont les prénoms des quatre filles du Prophète ﷺ ?",
-    options: [
-      "Khadidja, Umm Kheltoum, Fatima, Rokia",
-      "Zainab, Fatima, Umm Kheltoum, Rokia",
-      "Zainab, Fatima, Umm Habiba, Rokia",
-      "Fatima, Umm Habiba, Rokia, Khadidja",
-    ],
-    correctAnswer: "Zainab, Fatima, Umm Kheltoum, Rokia",
-  },
-  // Add more questions...
-];
 
 export default function QuizGameScreen() {
   const router = useRouter();
@@ -65,7 +43,9 @@ export default function QuizGameScreen() {
   const [jokers, setJokers] = useState(parseInt(numberOfJokers));
   const [helps, setHelps] = useState(parseInt(numberOfHelps));
   const [timeLeft, setTimeLeft] = useState(parseInt(responseTime));
-  const [questions] = useState<QuizQuestion[]>(mockQuestions.slice(0, parseInt(numberOfQuestions)));
+  const [questions, setQuestions] = useState<GameQuizQuestion[]>([]);
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState(true);
+  const [questionsError, setQuestionsError] = useState<string | null>(null);
 
   const currentQuestion = questions[currentQuestionIndex];
 
@@ -78,8 +58,41 @@ export default function QuizGameScreen() {
   };
   const themeTitle = getThemeTitle(theme || '');
 
+  const loadQuestions = async () => {
+    try {
+      setIsLoadingQuestions(true);
+      setQuestionsError(null);
+
+      const limit = Math.max(1, parseInt(numberOfQuestions));
+      const data = await quizService.getGameQuestions({
+        theme: theme || 'random',
+        limit,
+        language: currentLanguage,
+      });
+
+      setQuestions(data);
+      setCurrentQuestionIndex(0);
+      setSelectedOption(null);
+      setPoints(0);
+      setTimeLeft(parseInt(responseTime));
+    } catch (error) {
+      console.error('Failed to load quiz questions:', error);
+      setQuestionsError(t('errors.networkError'));
+      setQuestions([]);
+    } finally {
+      setIsLoadingQuestions(false);
+    }
+  };
+
+  // Load questions once on mount (and when theme or language changes)
+  useEffect(() => {
+    loadQuestions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme, currentLanguage, numberOfQuestions]);
+
   // Timer countdown
   useEffect(() => {
+    if (isLoadingQuestions || questions.length === 0) return;
     if (timeLeft <= 0) {
       // Time's up - move to next question
       handleNext();
@@ -98,7 +111,7 @@ export default function QuizGameScreen() {
     setSelectedOption(option);
     
     if (option === currentQuestion.correctAnswer) {
-      setPoints(points + 1);
+      setPoints((p) => p + 1);
     }
   };
 
@@ -114,7 +127,7 @@ export default function QuizGameScreen() {
         params: {
           points: points.toString(),
           totalQuestions: questions.length.toString(),
-          theme: theme || '',
+          theme: themeTitle,
         },
       });
     }
@@ -134,7 +147,7 @@ export default function QuizGameScreen() {
     }
   };
 
-  const isCorrect = selectedOption === currentQuestion.correctAnswer;
+  const isCorrect = selectedOption === currentQuestion?.correctAnswer;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -149,6 +162,31 @@ export default function QuizGameScreen() {
         <View style={styles.closeButton} />
       </View>
 
+      {isLoadingQuestions ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
+          <Text style={{ fontFamily: fontMedium, color: colors.text.secondary }}>Loading questions...</Text>
+        </View>
+      ) : questionsError || !currentQuestion ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, gap: 12 }}>
+          <Text style={{ fontFamily: fontBold, color: colors.text.primary }}>{t('errors.somethingWentWrong')}</Text>
+          <Text style={{ fontFamily: fontRegular, color: colors.text.secondary, textAlign: 'center' }}>
+            {questionsError || t('errors.networkError')}
+          </Text>
+          <Pressable
+            onPress={loadQuestions}
+            style={{
+              marginTop: 8,
+              paddingHorizontal: 18,
+              paddingVertical: 12,
+              borderRadius: 14,
+              backgroundColor: Colors.palette.purple.primary,
+            }}
+          >
+            <Text style={{ fontFamily: fontMedium, color: '#fff' }}>{t('errors.tryAgain')}</Text>
+          </Pressable>
+        </View>
+      ) : (
+      <>
       {/* Top Indicators - Kept small but updated with Emojis for consistency? 
           Actually, let's just make them simple text counts for now, or match Footer.
       */}
@@ -276,6 +314,8 @@ export default function QuizGameScreen() {
           <Ionicons name="arrow-forward" size={24} color="#FFFFFF" />
         </Pressable>
       </View>
+      </>
+      )}
     </View>
   );
 }
