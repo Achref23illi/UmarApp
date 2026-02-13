@@ -26,6 +26,7 @@ export default function ChallengeDetailsScreen() {
 
   const [challengeTitle, setChallengeTitle] = useState<string>('Challenge');
   const [levels, setLevels] = useState<ChallengeLevelWithUserState[]>([]);
+  const [configuredLevelIds, setConfiguredLevelIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -40,6 +41,7 @@ export default function ChallengeDetailsScreen() {
         if (!slug) {
           setChallengeTitle('Challenge');
           setLevels([]);
+          setConfiguredLevelIds(new Set());
           return;
         }
 
@@ -49,16 +51,24 @@ export default function ChallengeDetailsScreen() {
         if (!data) {
           setChallengeTitle('Challenge');
           setLevels([]);
+          setConfiguredLevelIds(new Set());
           setLoadError('Challenge not found');
           return;
         }
 
+        const configuredIds = await challengeDetailsService.getConfiguredLevelIds(
+          data.levels.map((level) => level.id)
+        );
+        if (!isActive) return;
+
         setChallengeTitle(data.category.title);
         setLevels(data.levels);
+        setConfiguredLevelIds(new Set(configuredIds));
       } catch (error) {
         console.error('Failed to load challenge details:', error);
         if (!isActive) return;
         setLoadError('Unable to load challenge');
+        setConfiguredLevelIds(new Set());
       } finally {
         if (!isActive) return;
         setIsLoading(false);
@@ -75,7 +85,14 @@ export default function ChallengeDetailsScreen() {
   const handleLevelPress = (level: ChallengeLevelWithUserState) => {
     if (level.status === 'locked') return;
 
-    // Always go through config for now (saves settings + starts the level)
+    if (level.status === 'active' || level.status === 'completed') {
+      router.push({
+        pathname: '/challenge-details/level/[id]',
+        params: { id: level.id, challengeSlug: slug },
+      });
+      return;
+    }
+
     router.push({
       pathname: '/challenge-details/config',
       params: { levelId: level.id, challengeSlug: slug },
@@ -180,7 +197,7 @@ export default function ChallengeDetailsScreen() {
                       <Text style={[styles.levelTitle, { fontFamily: fontBold, color: isLocked ? colors.text.secondary : colors.text.primary }]}>
                         {level.title}
                       </Text>
-                      {isActive && (
+                     {isActive && (
                          <View style={[styles.activeBadge, { backgroundColor: Colors.palette.purple.light }]}>
                            <Text style={[styles.activeBadgeText, { fontFamily: fontMedium, color: Colors.palette.purple.primary }]}>
                              En cours
@@ -198,11 +215,27 @@ export default function ChallengeDetailsScreen() {
                     </Text>
 
                     <View style={styles.cardFooter}>
-                       <View style={styles.durationBadge}>
-                          <Ionicons name="time-outline" size={14} color={colors.text.secondary} />
-                          <Text style={[styles.durationText, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-                            {level.durationDays} jours
-                          </Text>
+                       <View style={styles.footerMetaRow}>
+                         <View style={styles.durationBadge}>
+                            <Ionicons name="time-outline" size={14} color={colors.text.secondary} />
+                            <Text style={[styles.durationText, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+                              {level.durationDays} jours
+                            </Text>
+                         </View>
+                         {configuredLevelIds.has(level.id) ? (
+                           <View style={[styles.configBadge, { backgroundColor: 'rgba(76, 175, 80, 0.12)' }]}>
+                             <Ionicons name="checkmark-circle" size={12} color={Colors.palette.semantic.success} />
+                             <Text
+                               style={[
+                                 styles.configBadgeText,
+                                 { fontFamily: fontMedium, color: Colors.palette.semantic.success },
+                               ]}
+                               numberOfLines={1}
+                             >
+                               Reglages enregistres
+                             </Text>
+                           </View>
+                         ) : null}
                        </View>
                        
                        {!isLocked && (
@@ -323,6 +356,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 'auto',
+    gap: 8,
+  },
+  footerMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+    flex: 1,
   },
   durationBadge: {
     flexDirection: 'row',
@@ -335,5 +376,17 @@ const styles = StyleSheet.create({
   },
   durationText: {
     fontSize: 12,
+  },
+  configBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    maxWidth: '100%',
+  },
+  configBadgeText: {
+    fontSize: 11,
   },
 });

@@ -11,12 +11,7 @@ import * as Location from 'expo-location';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-    Pressable,
-    StyleSheet,
-    Text,
-    View
-} from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { InfiniteFeed } from '@/components/feed/InfiniteFeed';
@@ -31,15 +26,18 @@ export default function HomeScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const { colors, isDark } = useTheme();
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
-  
+
   const fontRegular = getFont(currentLanguage, 'regular');
   const fontMedium = getFont(currentLanguage, 'medium');
   const fontSemiBold = getFont(currentLanguage, 'semiBold');
   const fontBold = getFont(currentLanguage, 'bold');
 
-  const [locationCoords, setLocationCoords] = useState<{ lat: number; lng: number } | undefined>(undefined);
+  const [locationCoords, setLocationCoords] = useState<{ lat: number; lng: number } | undefined>(
+    undefined
+  );
   const [notificationCount, setNotificationCount] = useState(0);
   const [readingProgress, setReadingProgress] = useState<ReadingProgress | null>(null);
   const userData = useAppSelector((state) => state.user);
@@ -105,10 +103,10 @@ export default function HomeScreen() {
     if (readingProgress?.surahNumber) {
       router.push({
         pathname: '/quran/mushaf',
-        params: { 
+        params: {
           chapterId: readingProgress.surahNumber.toString(),
-          chapterName: readingProgress.surahName
-        }
+          chapterName: readingProgress.surahName,
+        },
       });
     } else {
       router.push('/quran');
@@ -116,12 +114,21 @@ export default function HomeScreen() {
   };
 
   const FeedHeader = () => (
-    <View style={[styles.headerContainer, { paddingTop: insets.top, backgroundColor: colors.background }]}>
+    <View
+      style={[
+        styles.headerContainer,
+        { paddingTop: insets.top, backgroundColor: colors.background },
+      ]}
+    >
       {/* Top Header: Profile, Search, Notifications */}
       <View style={styles.topHeader}>
         <Pressable onPress={() => router.push('/settings')} style={styles.profileButton}>
           {userData.avatar_url ? (
-            <Image source={{ uri: userData.avatar_url }} style={styles.profileAvatar} contentFit="cover" />
+            <Image
+              source={{ uri: userData.avatar_url }}
+              style={styles.profileAvatar}
+              contentFit="cover"
+            />
           ) : (
             <View style={[styles.profileAvatarPlaceholder, { backgroundColor: colors.surface }]}>
               <Ionicons name="person" size={24} color={colors.text.secondary} />
@@ -129,35 +136,55 @@ export default function HomeScreen() {
           )}
         </Pressable>
 
-        <Pressable 
+        <Pressable
           onPress={() => router.push('/search')}
-          style={[styles.searchBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
+          style={[
+            styles.searchBar,
+            { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+          ]}
         >
-          <Ionicons name="search-outline" size={18} color={colors.text.secondary} style={styles.searchIcon} />
-          <Text style={[styles.searchPlaceholder, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+          <Ionicons
+            name="search-outline"
+            size={18}
+            color={colors.text.secondary}
+            style={styles.searchIcon}
+          />
+          <Text
+            style={[
+              styles.searchPlaceholder,
+              { fontFamily: fontRegular, color: colors.text.secondary },
+            ]}
+          >
             {t('common.search')}
           </Text>
-          <Ionicons name="mic-outline" size={18} color={colors.text.secondary} style={styles.micIcon} />
+          <Ionicons
+            name="mic-outline"
+            size={18}
+            color={colors.text.secondary}
+            style={styles.micIcon}
+          />
         </Pressable>
 
-        <Pressable 
-          onPress={() => router.push('/notifications')}
-          style={styles.notificationButton}
-        >
+        <Pressable onPress={() => router.push('/notifications')} style={styles.notificationButton}>
           <Ionicons name="mail-outline" size={24} color={colors.text.primary} />
           {notificationCount > 0 && (
             <View style={[styles.badge, { backgroundColor: '#FF3B30' }]}>
-              <Text style={styles.badgeText}>{notificationCount > 9 ? '9+' : notificationCount}</Text>
+              <Text style={styles.badgeText}>
+                {notificationCount > 9 ? '9+' : notificationCount}
+              </Text>
             </View>
           )}
         </Pressable>
       </View>
 
       {/* Prayer Time Banner */}
-      <PrayerBanner coords={locationCoords} />
+      <PrayerBanner
+        coords={locationCoords}
+        style={[styles.homePrayerBanner, { marginHorizontal: width < 360 ? -8 : -12 }]}
+      />
 
       {/* Continue Reading Card */}
-      <Pressable 
+      <Pressable
         onPress={handleContinueReading}
         style={[styles.quranCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
       >
@@ -166,11 +193,20 @@ export default function HomeScreen() {
             <Ionicons name="book" size={24} color={colors.primary} />
           </View>
           <View style={styles.quranTextContainer}>
-            <Text style={[styles.quranTitle, { fontFamily: fontSemiBold, color: colors.text.primary }]}>
+            <Text
+              style={[styles.quranTitle, { fontFamily: fontSemiBold, color: colors.text.primary }]}
+            >
               {readingProgress ? t('quran.continueReading') : t('quran.readQuran')}
             </Text>
-            <Text style={[styles.quranSubtitle, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-              {readingProgress ? `${t('quran.page')} ${readingProgress.page}` : t('quran.startReading')}
+            <Text
+              style={[
+                styles.quranSubtitle,
+                { fontFamily: fontRegular, color: colors.text.secondary },
+              ]}
+            >
+              {readingProgress
+                ? `${t('quran.page')} ${readingProgress.page}`
+                : t('quran.startReading')}
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
@@ -182,9 +218,9 @@ export default function HomeScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <InfiniteFeed ListHeaderComponent={<FeedHeader />} userLocation={locationCoords} />
-      
+
       {/* FAB */}
-      <Pressable 
+      <Pressable
         style={[styles.fab, { backgroundColor: colors.primary }]}
         onPress={() => router.push('/feed/create')}
       >
@@ -317,5 +353,8 @@ const styles = StyleSheet.create({
   },
   quranSubtitle: {
     fontSize: 13,
+  },
+  homePrayerBanner: {
+    marginHorizontal: -12,
   },
 });

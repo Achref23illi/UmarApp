@@ -5,9 +5,10 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -20,7 +21,6 @@ import {
   Text,
   View,
 } from 'react-native';
-import * as Linking from 'expo-linking';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getFont } from '@/hooks/use-fonts';
@@ -28,21 +28,32 @@ import { useTheme } from '@/hooks/use-theme';
 import { socialService, Mosque } from '@/services/socialService';
 import { useAppSelector } from '@/store/hooks';
 
+const MAX_MOSQUE_RADIUS_KM = 30;
+const RADIUS_OPTIONS = [5, 10, 20, 30] as const;
+
 export function MosquesTab() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
-  
+
   const fontRegular = getFont(currentLanguage, 'regular');
   const fontMedium = getFont(currentLanguage, 'medium');
   const fontSemiBold = getFont(currentLanguage, 'semiBold');
   const fontBold = getFont(currentLanguage, 'bold');
 
-  const [mosques, setMosques] = useState<Mosque[]>([]);
+  const [allMosques, setAllMosques] = useState<Mosque[]>([]);
+  const [selectedRadiusKm, setSelectedRadiusKm] = useState<(typeof RADIUS_OPTIONS)[number]>(30);
   const [loading, setLoading] = useState(true);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [selectedMosque, setSelectedMosque] = useState<Mosque | null>(null);
+
+  const mosques = useMemo(
+    () =>
+      allMosques.filter(
+        (mosque) => (mosque.distance ?? Number.POSITIVE_INFINITY) <= selectedRadiusKm
+      ),
+    [allMosques, selectedRadiusKm]
+  );
 
   useEffect(() => {
     fetchMosques();
@@ -57,20 +68,24 @@ export function MosquesTab() {
         return;
       }
 
-      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
       const { latitude, longitude } = position.coords;
-      setUserLocation({ lat: latitude, lng: longitude });
 
       // Fetch mosques from service
       const mosquesList = await socialService.getMosques();
-      
-      // Calculate distances
-      const mosquesWithDistance = mosquesList.map((mosque) => ({
-        ...mosque,
-        distance: calculateDistance(latitude, longitude, mosque.latitude, mosque.longitude),
-      })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
 
-      setMosques(mosquesWithDistance);
+      // Calculate distances
+      const mosquesWithDistance = mosquesList
+        .map((mosque) => ({
+          ...mosque,
+          distance: calculateDistance(latitude, longitude, mosque.latitude, mosque.longitude),
+        }))
+        .filter((mosque) => (mosque.distance ?? Number.POSITIVE_INFINITY) <= MAX_MOSQUE_RADIUS_KM)
+        .sort((a, b) => (a.distance || 0) - (b.distance || 0));
+
+      setAllMosques(mosquesWithDistance);
     } catch (error) {
       console.error('Error fetching mosques:', error);
     } finally {
@@ -80,13 +95,15 @@ export function MosquesTab() {
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   };
 
@@ -100,10 +117,12 @@ export function MosquesTab() {
       ios: `maps:?daddr=${mosque.latitude},${mosque.longitude}&dirflg=d`,
       android: `geo:${mosque.latitude},${mosque.longitude}?q=${mosque.latitude},${mosque.longitude}(${encodeURIComponent(mosque.name)})`,
     });
-    
+
     if (url) {
       Linking.openURL(url).catch(() => {
-        Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${mosque.latitude},${mosque.longitude}`);
+        Linking.openURL(
+          `https://www.google.com/maps/dir/?api=1&destination=${mosque.latitude},${mosque.longitude}`
+        );
       });
     }
   };
@@ -143,13 +162,20 @@ export function MosquesTab() {
           <View style={styles.mosqueInfo}>
             <Ionicons name="business" size={24} color={colors.primary} />
             <View style={styles.mosqueNameContainer}>
-              <Text style={[styles.mosqueName, { fontFamily: fontBold, color: colors.text.primary }]}>
+              <Text
+                style={[styles.mosqueName, { fontFamily: fontBold, color: colors.text.primary }]}
+              >
                 {mosque.name}
               </Text>
               {mosque.adminPinned && (
                 <View style={styles.verifiedBadge}>
                   <Ionicons name="checkmark-circle" size={12} color="#4ade80" />
-                  <Text style={[styles.verifiedText, { fontFamily: fontMedium, color: '#4ade80', fontSize: 10 }]}>
+                  <Text
+                    style={[
+                      styles.verifiedText,
+                      { fontFamily: fontMedium, color: '#4ade80', fontSize: 10 },
+                    ]}
+                  >
                     Verified
                   </Text>
                 </View>
@@ -164,8 +190,8 @@ export function MosquesTab() {
             <View style={styles.genderIcons}>
               {hasMen && (
                 <View style={[styles.genderIcon, { backgroundColor: '#FFF' }]}>
-                  <Image 
-                    source={require('@/assets/images/man.png')} 
+                  <Image
+                    source={require('@/assets/images/man.png')}
                     style={styles.genderImage}
                     resizeMode="contain"
                   />
@@ -173,8 +199,8 @@ export function MosquesTab() {
               )}
               {hasWomen && (
                 <View style={[styles.genderIcon, { backgroundColor: '#000' }]}>
-                  <Image 
-                    source={require('@/assets/images/woman.png')} 
+                  <Image
+                    source={require('@/assets/images/woman.png')}
                     style={styles.genderImage}
                     resizeMode="contain"
                   />
@@ -201,7 +227,9 @@ export function MosquesTab() {
         </View>
         <View style={styles.prayerTimesRow}>
           <Ionicons name="person" size={16} color={colors.text.secondary} />
-          <Text style={[styles.nextPrayer, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+          <Text
+            style={[styles.nextPrayer, { fontFamily: fontRegular, color: colors.text.secondary }]}
+          >
             Prochaine Salat, {getNextPrayerTime()}
           </Text>
         </View>
@@ -211,10 +239,7 @@ export function MosquesTab() {
 
         {/* Action Icons */}
         <View style={styles.actionIcons}>
-          <Pressable 
-            style={styles.actionIcon}
-            onPress={() => setSelectedMosque(mosque)}
-          >
+          <Pressable style={styles.actionIcon} onPress={() => setSelectedMosque(mosque)}>
             <View style={[styles.iconContainer, { backgroundColor: colors.surfaceHighlight }]}>
               <Ionicons name="information-circle" size={20} color={colors.primary} />
             </View>
@@ -231,24 +256,20 @@ export function MosquesTab() {
           {mosque.parkingAvailable && (
             <Pressable style={styles.actionIcon}>
               <View style={[styles.iconContainer, { backgroundColor: colors.surfaceHighlight }]}>
-                <Text style={[styles.parkingIcon, { fontFamily: fontBold, color: colors.primary }]}>P</Text>
+                <Text style={[styles.parkingIcon, { fontFamily: fontBold, color: colors.primary }]}>
+                  P
+                </Text>
               </View>
             </Pressable>
           )}
 
-          <Pressable 
-            style={styles.actionIcon}
-            onPress={() => openNavigation(mosque)}
-          >
+          <Pressable style={styles.actionIcon} onPress={() => openNavigation(mosque)}>
             <View style={[styles.iconContainer, { backgroundColor: colors.surfaceHighlight }]}>
               <Ionicons name="navigate" size={20} color={colors.primary} />
             </View>
           </Pressable>
 
-          <Pressable 
-            style={styles.actionIcon}
-            onPress={() => shareMosque(mosque)}
-          >
+          <Pressable style={styles.actionIcon} onPress={() => shareMosque(mosque)}>
             <View style={[styles.iconContainer, { backgroundColor: colors.surfaceHighlight }]}>
               <Ionicons name="share-social" size={20} color={colors.primary} />
             </View>
@@ -263,16 +284,16 @@ export function MosquesTab() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: 8 }]}>
         <Text style={[styles.headerTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
-          Mosques Nearby
+          Mosques Nearby ({selectedRadiusKm}km)
         </Text>
         <View style={styles.headerActions}>
-          <Pressable 
+          <Pressable
             onPress={() => router.push('/(tabs)/mosques')}
             style={[styles.mapButton, { backgroundColor: colors.surface }]}
           >
             <Ionicons name="map" size={22} color={colors.text.primary} />
           </Pressable>
-          <Pressable 
+          <Pressable
             onPress={fetchMosques}
             style={[styles.refreshButton, { backgroundColor: colors.surface }]}
           >
@@ -281,11 +302,44 @@ export function MosquesTab() {
         </View>
       </View>
 
+      <View style={styles.radiusSelector}>
+        {RADIUS_OPTIONS.map((radius) => {
+          const isSelected = selectedRadiusKm === radius;
+          return (
+            <Pressable
+              key={radius}
+              onPress={() => setSelectedRadiusKm(radius)}
+              style={[
+                styles.radiusChip,
+                {
+                  backgroundColor: isSelected ? colors.primary : colors.surface,
+                  borderColor: isSelected ? colors.primary : colors.border,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.radiusChipText,
+                  {
+                    color: isSelected ? '#fff' : colors.text.secondary,
+                    fontFamily: isSelected ? fontSemiBold : fontMedium,
+                  },
+                ]}
+              >
+                {radius} km
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       {loading ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { fontFamily: fontMedium, color: colors.text.secondary }]}>
-            Finding nearby mosques...
+          <Text
+            style={[styles.loadingText, { fontFamily: fontMedium, color: colors.text.secondary }]}
+          >
+            Finding mosques within {selectedRadiusKm}km...
           </Text>
         </View>
       ) : (
@@ -298,8 +352,10 @@ export function MosquesTab() {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="business-outline" size={64} color={colors.text.disabled} />
-              <Text style={[styles.emptyText, { fontFamily: fontMedium, color: colors.text.secondary }]}>
-                No mosques found nearby
+              <Text
+                style={[styles.emptyText, { fontFamily: fontMedium, color: colors.text.secondary }]}
+              >
+                No mosques found within {selectedRadiusKm}km
               </Text>
             </View>
           }
@@ -313,60 +369,95 @@ export function MosquesTab() {
         animationType="slide"
         onRequestClose={() => setSelectedMosque(null)}
       >
-        <Pressable 
-          style={styles.modalOverlay} 
-          onPress={() => setSelectedMosque(null)}
-        >
-          <Pressable 
+        <Pressable style={styles.modalOverlay} onPress={() => setSelectedMosque(null)}>
+          <Pressable
             style={[styles.modalContent, { backgroundColor: colors.background }]}
             onPress={(e) => e.stopPropagation()}
           >
             {selectedMosque && (
               <>
                 <View style={styles.modalHeader}>
-                  <Text style={[styles.modalTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
+                  <Text
+                    style={[
+                      styles.modalTitle,
+                      { fontFamily: fontBold, color: colors.text.primary },
+                    ]}
+                  >
                     {selectedMosque.name}
                   </Text>
                   <Pressable onPress={() => setSelectedMosque(null)}>
                     <Ionicons name="close" size={24} color={colors.text.primary} />
                   </Pressable>
                 </View>
-                
+
                 <View style={styles.modalBody}>
                   <View style={styles.modalRow}>
                     <Ionicons name="location" size={20} color={colors.text.secondary} />
-                    <Text style={[styles.modalText, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+                    <Text
+                      style={[
+                        styles.modalText,
+                        { fontFamily: fontRegular, color: colors.text.secondary },
+                      ]}
+                    >
                       {selectedMosque.address}
                     </Text>
                   </View>
-                  
+
                   {selectedMosque.capacity && (
                     <View style={styles.modalRow}>
                       <Ionicons name="people" size={20} color={colors.text.secondary} />
-                      <Text style={[styles.modalText, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+                      <Text
+                        style={[
+                          styles.modalText,
+                          { fontFamily: fontRegular, color: colors.text.secondary },
+                        ]}
+                      >
                         Capacity: {selectedMosque.capacity}
                       </Text>
                     </View>
                   )}
-                  
+
                   <View style={styles.modalRow}>
-                    <Ionicons name="checkmark-circle" size={20} color={selectedMosque.hasWomenSection ? '#4ade80' : colors.text.disabled} />
-                    <Text style={[styles.modalText, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-                      Women's Section: {selectedMosque.hasWomenSection ? 'Yes' : 'No'}
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={20}
+                      color={selectedMosque.hasWomenSection ? '#4ade80' : colors.text.disabled}
+                    />
+                    <Text
+                      style={[
+                        styles.modalText,
+                        { fontFamily: fontRegular, color: colors.text.secondary },
+                      ]}
+                    >
+                      {"Women's Section"}: {selectedMosque.hasWomenSection ? 'Yes' : 'No'}
                     </Text>
                   </View>
-                  
+
                   <View style={styles.modalRow}>
-                    <Ionicons name="car" size={20} color={selectedMosque.parkingAvailable ? '#4ade80' : colors.text.disabled} />
-                    <Text style={[styles.modalText, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+                    <Ionicons
+                      name="car"
+                      size={20}
+                      color={selectedMosque.parkingAvailable ? '#4ade80' : colors.text.disabled}
+                    />
+                    <Text
+                      style={[
+                        styles.modalText,
+                        { fontFamily: fontRegular, color: colors.text.secondary },
+                      ]}
+                    >
                       Parking: {selectedMosque.parkingAvailable ? 'Available' : 'Not Available'}
                     </Text>
                   </View>
-                  
+
                   {selectedMosque.wheelchairAccess && (
                     <View style={styles.modalRow}>
                       <Ionicons name="accessibility" size={20} color="#4ade80" />
-                      <Text style={[styles.modalText, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+                      <Text
+                        style={[
+                          styles.modalText,
+                          { fontFamily: fontRegular, color: colors.text.secondary },
+                        ]}
+                      >
                         Wheelchair Accessible
                       </Text>
                     </View>
@@ -398,6 +489,21 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     gap: 8,
+  },
+  radiusSelector: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    gap: 8,
+    marginBottom: 10,
+  },
+  radiusChip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  radiusChipText: {
+    fontSize: 12,
   },
   mapButton: {
     width: 44,

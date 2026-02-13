@@ -253,8 +253,8 @@ export default function LevelDashboardScreen() {
   // --- Views for each Tab ---
 
   const ContentView = () => (
-    <Animated.View entering={SlideInRight} style={[styles.tabContent, { flex: 1 }]}>
-      <View style={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 12, gap: 16 }}>
+    <Animated.View entering={SlideInRight} style={styles.tabContent}>
+      <View style={{ gap: 16 }}>
         <View style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}>
           <Text style={[styles.actionTitle, { fontFamily: fontBold, color: colors.text.primary }]}>{actionTitle}</Text>
           <Text style={[styles.actionDesc, { fontFamily: fontRegular, color: colors.text.secondary }]}>
@@ -379,9 +379,7 @@ export default function LevelDashboardScreen() {
         </View>
       </View>
 
-      <View style={{ flex: 1, paddingBottom: insets.bottom + 12 }}>
-        <ContentTab challengeSlug={challengeKind} levelId={levelId} />
-      </View>
+      <ContentTab challengeSlug={challengeKind} levelId={levelId} embedded />
     </Animated.View>
   );
 
@@ -534,7 +532,7 @@ export default function LevelDashboardScreen() {
             <Text style={[styles.headerTitle, { fontFamily: fontBold }]}>{level?.title || 'Niveau'}</Text>
             <Pressable onPress={() => router.push({
               pathname: '/challenge-details/config',
-              params: { challengeSlug: challengeKind, levelId: levelId }
+              params: { challengeSlug: challengeKind, levelId: levelId, source: 'level' }
             })} style={styles.backButton}>
               <Ionicons name="settings-outline" size={24} color="#FFF" />
             </Pressable>
@@ -633,7 +631,10 @@ export default function LevelDashboardScreen() {
 
       {/* Content Area */}
       {activeTab === 'content' ? (
-        <View style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={[styles.contentArea, { paddingBottom: insets.bottom + 20 }]}
+          showsVerticalScrollIndicator={false}
+        >
           {isLoading ? (
             <View style={{ paddingVertical: 40, alignItems: 'center' }}>
               <ActivityIndicator size="large" color={actionColor} />
@@ -645,7 +646,7 @@ export default function LevelDashboardScreen() {
           ) : null}
 
           {!loadError ? <ContentView /> : null}
-        </View>
+        </ScrollView>
       ) : (
         <ScrollView
           contentContainerStyle={[styles.contentArea, { paddingBottom: insets.bottom + 20 }]}

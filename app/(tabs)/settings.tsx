@@ -3,13 +3,7 @@ import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getFont } from '@/hooks/use-fonts';
@@ -17,18 +11,17 @@ import { useTheme } from '@/hooks/use-theme';
 import { userStatsService } from '@/services/userStatsService';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setLanguage } from '@/store/slices/languageSlice';
-import { logoutUser, setTheme } from '@/store/slices/userSlice';
+import { logoutUser } from '@/store/slices/userSlice';
 
 export default function SettingsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { colors, theme } = useTheme();
+  const { colors } = useTheme();
   const dispatch = useAppDispatch();
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
   const userData = useAppSelector((state) => state.user);
   const isRTL = currentLanguage === 'ar';
-  const themePreference = useAppSelector((state) => state.user.preferences.theme);
 
   const fontRegular = getFont(currentLanguage, 'regular');
   const fontMedium = getFont(currentLanguage, 'medium');
@@ -90,9 +83,18 @@ export default function SettingsScreen() {
 
   const menuItems = [
     { icon: 'person-outline', labelKey: 'profile.editProfile', route: '/profile/edit' },
-    { icon: 'notifications-outline', labelKey: 'profile.notifications', route: '/profile/notifications' },
+    {
+      icon: 'notifications-outline',
+      labelKey: 'profile.notifications',
+      route: '/profile/notifications',
+    },
     // { icon: 'moon-outline', labelKey: 'profile.prayerSettings', route: '/profile/prayer-settings' }, // Moved to generic settings
-    { icon: 'diamond-outline', labelKey: 'profile.goPremium', route: '/profile/premium', highlight: true },
+    {
+      icon: 'diamond-outline',
+      labelKey: 'profile.goPremium',
+      route: '/profile/premium',
+      highlight: true,
+    },
     { icon: 'help-circle-outline', labelKey: 'profile.helpSupport', route: '/profile/help' },
     { icon: 'information-circle-outline', labelKey: 'profile.about', route: '/profile/about' },
   ];
@@ -102,12 +104,6 @@ export default function SettingsScreen() {
     { code: 'fr', label: 'Français' },
     { code: 'ar', label: 'العربية' },
   ];
-
-  const themes = [
-    { code: 'light', labelKey: 'settings.theme.light', icon: 'sunny-outline' },
-    { code: 'dark', labelKey: 'settings.theme.dark', icon: 'moon-outline' },
-    { code: 'system', labelKey: 'settings.theme.system', icon: 'phone-portrait-outline' },
-  ] as const;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -120,7 +116,9 @@ export default function SettingsScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={[styles.headerTitle, { fontFamily: fontBold, color: colors.text.primary }]}>Settings</Text>
+          <Text style={[styles.headerTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
+            Settings
+          </Text>
         </View>
 
         {/* Profile Card */}
@@ -129,40 +127,78 @@ export default function SettingsScreen() {
             {user.avatar ? (
               <Image source={{ uri: user.avatar }} style={styles.avatar} />
             ) : (
-              <View style={[styles.avatarPlaceholder, { backgroundColor: colors.surfaceHighlight }]}>
+              <View
+                style={[styles.avatarPlaceholder, { backgroundColor: colors.surfaceHighlight }]}
+              >
                 <Ionicons name="person" size={40} color={colors.text.secondary} />
               </View>
             )}
             {user.isPremium && (
-              <View style={[styles.premiumBadge, { backgroundColor: colors.secondary, borderColor: colors.surface }]}>
+              <View
+                style={[
+                  styles.premiumBadge,
+                  { backgroundColor: colors.secondary, borderColor: colors.surface },
+                ]}
+              >
                 <Ionicons name="diamond" size={14} color={colors.text.inverse} />
               </View>
             )}
           </View>
 
-          <Text style={[styles.userName, { fontFamily: fontSemiBold, color: colors.text.primary }]}>{user.name}</Text>
-          <Text style={[styles.userEmail, { fontFamily: fontRegular, color: colors.text.secondary }]}>{user.email}</Text>
+          <Text style={[styles.userName, { fontFamily: fontSemiBold, color: colors.text.primary }]}>
+            {user.name}
+          </Text>
+          <Text
+            style={[styles.userEmail, { fontFamily: fontRegular, color: colors.text.secondary }]}
+          >
+            {user.email}
+          </Text>
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, { fontFamily: fontBold, color: colors.primary }]}>{user.points}</Text>
-              <Text style={[styles.statLabel, { fontFamily: fontRegular, color: colors.text.secondary }]}>{t('common.points')}</Text>
+              <Text style={[styles.statValue, { fontFamily: fontBold, color: colors.primary }]}>
+                {user.points}
+              </Text>
+              <Text
+                style={[
+                  styles.statLabel,
+                  { fontFamily: fontRegular, color: colors.text.secondary },
+                ]}
+              >
+                {t('common.points')}
+              </Text>
             </View>
             <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, { fontFamily: fontBold, color: colors.primary }]}>{user.badges.length}</Text>
-              <Text style={[styles.statLabel, { fontFamily: fontRegular, color: colors.text.secondary }]}>{t('common.badges')}</Text>
+              <Text style={[styles.statValue, { fontFamily: fontBold, color: colors.primary }]}>
+                {user.badges.length}
+              </Text>
+              <Text
+                style={[
+                  styles.statLabel,
+                  { fontFamily: fontRegular, color: colors.text.secondary },
+                ]}
+              >
+                {t('common.badges')}
+              </Text>
             </View>
-             <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
             <View style={styles.statItem}>
               <Text style={[styles.statValue, { fontFamily: fontBold, color: colors.primary }]}>
                 {user.isPremium ? '✓' : '−'}
               </Text>
-              <Text style={[styles.statLabel, { fontFamily: fontRegular, color: colors.text.secondary }]}>{t('common.premium')}</Text>
+              <Text
+                style={[
+                  styles.statLabel,
+                  { fontFamily: fontRegular, color: colors.text.secondary },
+                ]}
+              >
+                {t('common.premium')}
+              </Text>
             </View>
           </View>
         </View>
-        
+
         {/* Menu Items */}
         <View style={[styles.menuContainer, { backgroundColor: colors.surface }]}>
           {menuItems.map((item, index) => (
@@ -171,12 +207,12 @@ export default function SettingsScreen() {
               style={[
                 styles.menuItem,
                 { borderBottomColor: colors.border },
-                item.highlight && { backgroundColor: colors.primary }
+                item.highlight && { backgroundColor: colors.primary },
               ]}
               onPress={() => router.push(item.route as never)}
             >
               <View style={styles.menuItemLeft}>
-                 <View
+                <View
                   style={[
                     styles.menuIconContainer,
                     { backgroundColor: colors.surfaceHighlight },
@@ -199,7 +235,7 @@ export default function SettingsScreen() {
                   {t(item.labelKey)}
                 </Text>
               </View>
-               <Ionicons
+              <Ionicons
                 name={isRTL ? 'chevron-back' : 'chevron-forward'}
                 size={20}
                 color={item.highlight ? colors.secondary : colors.text.disabled}
@@ -208,70 +244,52 @@ export default function SettingsScreen() {
           ))}
         </View>
 
-        {/* Appearance Settings */}
-        <Text style={[styles.sectionTitle, { fontFamily: fontBold, color: colors.text.secondary }]}>{t('settings.appearance')}</Text>
-         <View style={[styles.settingsCard, { backgroundColor: colors.surface }]}>
-           <View style={styles.themeRow}>
-            {themes.map((item) => {
-                const isActive = themePreference === item.code;
-                return (
-                  <Pressable
-                    key={item.code}
-                    onPress={() => dispatch(setTheme(item.code))}
-                    style={[
-                      styles.themeOption,
-                      { 
-                        backgroundColor: isActive ? colors.primary : 'transparent',
-                        borderColor: colors.border,
-                      }
-                    ]}
-                  >
-                    <Ionicons 
-                      name={item.icon as any} 
-                      size={24} 
-                      color={isActive ? colors.text.inverse : colors.text.primary} 
-                    />
-                    <Text style={[
-                      styles.themeLabel, 
-                      { fontFamily: fontMedium, color: isActive ? colors.text.inverse : colors.text.primary }
-                    ]}>
-                      {t(item.labelKey)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-           </View>
-         </View>
-
-         {/* Language Settings */}
-        <Text style={[styles.sectionTitle, { fontFamily: fontBold, color: colors.text.secondary, marginTop: 24 }]}>{t('settings.language')}</Text>
+        {/* Language Settings */}
+        <Text
+          style={[
+            styles.sectionTitle,
+            { fontFamily: fontBold, color: colors.text.secondary, marginTop: 24 },
+          ]}
+        >
+          {t('settings.language')}
+        </Text>
         <View style={[styles.settingsCard, { backgroundColor: colors.surface }]}>
-            {languages.map((item, index) => (
-                <Pressable
-                    key={item.code}
-                    onPress={() => dispatch(setLanguage(item.code as any))}
-                    style={[styles.languageItem, { borderBottomColor: index === languages.length - 1 ? 'transparent' : colors.divider }]}
-                >
-                    <Text style={[styles.languageLabel, { fontFamily: fontMedium, color: colors.text.primary }]}>
-                    {item.label}
-                    </Text>
-                    {currentLanguage === item.code && (
-                    <Ionicons name="checkmark" size={24} color={colors.primary} />
-                    )}
-                </Pressable>
-            ))}
+          {languages.map((item, index) => (
+            <Pressable
+              key={item.code}
+              onPress={() => dispatch(setLanguage(item.code as any))}
+              style={[
+                styles.languageItem,
+                {
+                  borderBottomColor:
+                    index === languages.length - 1 ? 'transparent' : colors.divider,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.languageLabel,
+                  { fontFamily: fontMedium, color: colors.text.primary },
+                ]}
+              >
+                {item.label}
+              </Text>
+              {currentLanguage === item.code && (
+                <Ionicons name="checkmark" size={24} color={colors.primary} />
+              )}
+            </Pressable>
+          ))}
         </View>
 
         {/* Logout Button */}
-        <Pressable 
-          style={({ pressed }) => [
-            styles.logoutButton,
-            { opacity: pressed ? 0.6 : 1 }
-          ]} 
+        <Pressable
+          style={({ pressed }) => [styles.logoutButton, { opacity: pressed ? 0.6 : 1 }]}
           onPress={handleSignOut}
         >
           <Ionicons name="log-out-outline" size={20} color="#E53935" />
-          <Text style={[styles.logoutText, { fontFamily: fontMedium, color: '#E53935' }]}>{t('profile.signOut')}</Text>
+          <Text style={[styles.logoutText, { fontFamily: fontMedium, color: '#E53935' }]}>
+            {t('profile.signOut')}
+          </Text>
         </Pressable>
       </ScrollView>
     </View>
@@ -392,32 +410,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   settingsCard: {
-      borderRadius: 16,
-      padding: 16,
-      marginBottom: 24,
-      borderWidth: 1,
-      borderColor: 'rgba(0,0,0,0.05)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
   },
   sectionTitle: {
-      fontSize: 14,
-      marginBottom: 12,
-      textTransform: 'uppercase',
-  },
-  themeRow: {
-      flexDirection: 'row',
-      gap: 8,
-  },
-  themeOption: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 8,
-  },
-  themeLabel: {
-    fontSize: 12,
+    fontSize: 14,
+    marginBottom: 12,
+    textTransform: 'uppercase',
   },
   languageItem: {
     flexDirection: 'row',

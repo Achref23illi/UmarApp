@@ -98,6 +98,10 @@ type SettingsRow = {
   arabic_enabled: boolean;
 };
 
+type SettingsLevelRow = {
+  level_id: string;
+};
+
 type SurahReadRow = {
   surah_number: number;
 };
@@ -913,6 +917,26 @@ export const challengeDetailsService = {
       reminders: row.reminders_enabled,
       arabic: row.arabic_enabled,
     };
+  },
+
+  getConfiguredLevelIds: async (levelIds: string[]): Promise<string[]> => {
+    const uniqueLevelIds = [...new Set(levelIds.filter((value) => !!value))];
+    if (!uniqueLevelIds.length) return [];
+
+    const { data: session } = await supabase.auth.getSession();
+    const userId = session.session?.user?.id;
+    if (!userId) return [];
+
+    const { data, error } = await supabase
+      .from('user_challenge_settings')
+      .select('level_id')
+      .eq('user_id', userId)
+      .in('level_id', uniqueLevelIds);
+
+    if (error) throw error;
+
+    const configuredRows = (data as SettingsLevelRow[] | null) ?? [];
+    return [...new Set(configuredRows.map((row) => row.level_id))];
   },
 
   saveSettingsForLevel: async ({

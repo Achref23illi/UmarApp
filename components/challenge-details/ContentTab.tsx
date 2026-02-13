@@ -47,9 +47,10 @@ type Article = {
 type ContentTabProps = {
   challengeSlug?: string;
   levelId?: string;
+  embedded?: boolean;
 };
 
-export default function ContentTab({ challengeSlug, levelId }: ContentTabProps) {
+export default function ContentTab({ challengeSlug, levelId, embedded = false }: ContentTabProps) {
   const router = useRouter();
   const { colors } = useTheme();
   const params = useLocalSearchParams();
@@ -576,8 +577,85 @@ export default function ContentTab({ challengeSlug, levelId }: ContentTabProps) 
     return null;
   };
 
+  const contentNodes = (
+    <>
+      <View style={{ gap: 16 }}>
+        {renderDailySection()}
+
+        <View style={styles.sectionHeaderRow}>
+          <Text style={[styles.sectionTitle, { fontFamily: fontBold, color: colors.text.primary }]}>Contenu</Text>
+          <Text style={[styles.sectionSubtitle, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+            Articles et rappels (clique pour développer)
+          </Text>
+        </View>
+      </View>
+
+      <View style={{ height: 16 }} />
+
+      {articles.map((item, idx) => {
+        const isExpanded = expandedId === item.id;
+        const isLevelSpecific = !!item.level_id;
+
+        return (
+          <View key={item.id}>
+            <Pressable
+              style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, isExpanded && styles.cardExpanded]}
+              onPress={() => toggleExpand(item.id)}
+            >
+              <View style={[styles.indicatorBar, { backgroundColor: isLevelSpecific ? Colors.palette.purple.primary : Colors.palette.gold.dark }]} />
+              <View style={styles.cardContent}>
+                <View style={styles.headerRow}>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text
+                        style={[
+                          styles.cardTitle,
+                          {
+                            fontFamily: isExpanded ? fontBold : fontMedium,
+                            color: isExpanded ? Colors.palette.purple.primary : colors.text.primary,
+                          },
+                        ]}
+                      >
+                        {item.title}
+                      </Text>
+                      {isLevelSpecific ? (
+                        <View style={[styles.badge, { backgroundColor: Colors.palette.purple.muted }]}>
+                          <Text style={[styles.badgeText, { fontFamily: fontMedium, color: Colors.palette.purple.primary }]}>Niveau</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+
+                  <Ionicons
+                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                    size={20}
+                    color={isExpanded ? Colors.palette.purple.primary : colors.text.secondary}
+                  />
+                </View>
+
+                {isExpanded ? (
+                  <View style={[styles.bodyContainer, { borderTopColor: colors.divider }]}>
+                    <Text style={[styles.bodyText, { fontFamily: fontRegular, color: colors.text.secondary }]}>{item.content}</Text>
+                  </View>
+                ) : null}
+              </View>
+            </Pressable>
+
+            {idx < articles.length - 1 ? <View style={{ height: 12 }} /> : null}
+          </View>
+        );
+      })}
+    </>
+  );
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: colors.background },
+        embedded && styles.embeddedContainer,
+      ]}
+    >
       {isLoadingDay ? (
         <View style={{ paddingVertical: 16, alignItems: 'center' }}>
           <ActivityIndicator color={colors.primary} />
@@ -594,74 +672,13 @@ export default function ContentTab({ challengeSlug, levelId }: ContentTabProps) 
         </View>
       ) : null}
 
-      <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-        <View style={{ gap: 16 }}>
-          {renderDailySection()}
-
-          <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionTitle, { fontFamily: fontBold, color: colors.text.primary }]}>Contenu</Text>
-            <Text style={[styles.sectionSubtitle, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-              Articles et rappels (clique pour développer)
-            </Text>
-          </View>
-        </View>
-
-        <View style={{ height: 16 }} />
-
-        {articles.map((item, idx) => {
-          const isExpanded = expandedId === item.id;
-          const isLevelSpecific = !!item.level_id;
-
-          return (
-            <View key={item.id}>
-              <Pressable
-                style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, isExpanded && styles.cardExpanded]}
-                onPress={() => toggleExpand(item.id)}
-              >
-                <View style={[styles.indicatorBar, { backgroundColor: isLevelSpecific ? Colors.palette.purple.primary : Colors.palette.gold.dark }]} />
-                <View style={styles.cardContent}>
-                  <View style={styles.headerRow}>
-                    <View style={{ flex: 1, paddingRight: 8 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Text
-                          style={[
-                            styles.cardTitle,
-                            {
-                              fontFamily: isExpanded ? fontBold : fontMedium,
-                              color: isExpanded ? Colors.palette.purple.primary : colors.text.primary,
-                            },
-                          ]}
-                        >
-                          {item.title}
-                        </Text>
-                        {isLevelSpecific ? (
-                          <View style={[styles.badge, { backgroundColor: Colors.palette.purple.muted }]}>
-                            <Text style={[styles.badgeText, { fontFamily: fontMedium, color: Colors.palette.purple.primary }]}>Niveau</Text>
-                          </View>
-                        ) : null}
-                      </View>
-                    </View>
-
-                    <Ionicons
-                      name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                      size={20}
-                      color={isExpanded ? Colors.palette.purple.primary : colors.text.secondary}
-                    />
-                  </View>
-
-                  {isExpanded ? (
-                    <View style={[styles.bodyContainer, { borderTopColor: colors.divider }]}>
-                      <Text style={[styles.bodyText, { fontFamily: fontRegular, color: colors.text.secondary }]}>{item.content}</Text>
-                    </View>
-                  ) : null}
-                </View>
-              </Pressable>
-
-              {idx < articles.length - 1 ? <View style={{ height: 12 }} /> : null}
-            </View>
-          );
-        })}
-      </ScrollView>
+      {embedded ? (
+        <View style={[styles.listContent, styles.embeddedListContent]}>{contentNodes}</View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+          {contentNodes}
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -670,9 +687,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  embeddedContainer: {
+    flex: 0,
+  },
   listContent: {
     padding: 16,
     paddingBottom: 40,
+  },
+  embeddedListContent: {
+    padding: 0,
+    paddingBottom: 20,
   },
 
   sectionHeaderRow: {
