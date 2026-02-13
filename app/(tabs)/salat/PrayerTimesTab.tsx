@@ -9,16 +9,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
@@ -54,11 +46,10 @@ interface DayTimings {
 }
 
 export function PrayerTimesTab() {
-  const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
-  
+
   const fontRegular = getFont(currentLanguage, 'regular');
   const fontMedium = getFont(currentLanguage, 'medium');
   const fontSemiBold = getFont(currentLanguage, 'semiBold');
@@ -68,7 +59,6 @@ export function PrayerTimesTab() {
   const [loading, setLoading] = useState(true);
   const [locationName, setLocationName] = useState('');
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
-  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   useEffect(() => {
@@ -87,7 +77,6 @@ export function PrayerTimesTab() {
 
       const position = await Location.getCurrentPositionAsync({});
       const { latitude, longitude } = position.coords;
-      setUserCoords({ lat: latitude, lng: longitude });
 
       const [address] = await Location.reverseGeocodeAsync({ latitude, longitude });
       if (address) {
@@ -96,34 +85,38 @@ export function PrayerTimesTab() {
 
       const month = currentMonth.getMonth() + 1;
       const year = currentMonth.getFullYear();
-      
+
       const response = await fetch(
         `https://api.aladhan.com/v1/calendar/${year}/${month}?latitude=${latitude}&longitude=${longitude}&method=2`
       );
       const data = await response.json();
 
       if (data.code === 200) {
-        const allDays = data.data;
+        const allDays: DayTimings[] = data.data || [];
+        setWeeklyTimings(allDays);
+
         const today = new Date();
-        const currentDay = today.getDate();
-        
-        // Get 7 days starting from today
-        const upcomingDays = allDays.filter((d: any) => {
-          const dayNum = parseInt(d.date.gregorian.day, 10);
-          const monthNum = parseInt(d.date.gregorian.month.number, 10);
-          const yearNum = parseInt(d.date.gregorian.year, 10);
-          
-          const dayDate = new Date(yearNum, monthNum - 1, dayNum);
-          const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-          
-          return dayDate >= todayDate;
-        }).slice(0, 7);
-        
-        setWeeklyTimings(upcomingDays);
+        const isCurrentMonth =
+          currentMonth.getMonth() === today.getMonth() &&
+          currentMonth.getFullYear() === today.getFullYear();
+
+        if (isCurrentMonth) {
+          const todayIndex = allDays.findIndex(
+            (day) => parseInt(day.date.gregorian.day, 10) === today.getDate()
+          );
+          setSelectedDayIndex(todayIndex >= 0 ? todayIndex : 0);
+        } else {
+          setSelectedDayIndex(0);
+        }
+      } else {
+        setWeeklyTimings([]);
+        setSelectedDayIndex(0);
       }
     } catch (error) {
       console.error('Error fetching prayer times:', error);
       setLocationName(t('prayer.errorFetchingData') || 'Error fetching data');
+      setWeeklyTimings([]);
+      setSelectedDayIndex(0);
     } finally {
       setLoading(false);
     }
@@ -133,19 +126,21 @@ export function PrayerTimesTab() {
     const year = parseInt(gregorian.year, 10);
     const month = gregorian.month.number - 1;
     const dayNum = parseInt(gregorian.day, 10);
-    
+
     const date = new Date(year, month, dayNum);
     const today = new Date();
-    
+
     if (
-      date.getDate() === today.getDate() && 
+      date.getDate() === today.getDate() &&
       date.getMonth() === today.getMonth() &&
       date.getFullYear() === today.getFullYear()
     ) {
       return t('prayer.today') || 'Today';
     }
-    
-    return date.toLocaleDateString(currentLanguage === 'fr' ? 'fr-FR' : 'en-US', { weekday: 'short' });
+
+    return date.toLocaleDateString(currentLanguage === 'fr' ? 'fr-FR' : 'en-US', {
+      weekday: 'short',
+    });
   };
 
   const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
@@ -154,7 +149,7 @@ export function PrayerTimesTab() {
     Dhuhr: 'sunny-outline',
     Asr: 'partly-sunny-outline',
     Maghrib: 'cloudy-night-outline',
-    Isha: 'moon-outline'
+    Isha: 'moon-outline',
   };
 
   const formatTime = (timeStr: string) => {
@@ -167,7 +162,10 @@ export function PrayerTimesTab() {
     setCurrentMonth(newMonth);
   };
 
-  const monthName = currentMonth.toLocaleDateString(currentLanguage === 'fr' ? 'fr-FR' : 'en-US', { month: 'long', year: 'numeric' });
+  const monthName = currentMonth.toLocaleDateString(currentLanguage === 'fr' ? 'fr-FR' : 'en-US', {
+    month: 'long',
+    year: 'numeric',
+  });
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -180,7 +178,12 @@ export function PrayerTimesTab() {
           {locationName && (
             <View style={styles.locationRow}>
               <Ionicons name="location" size={14} color={colors.primary} />
-              <Text style={[styles.locationText, { fontFamily: fontMedium, color: colors.text.secondary }]}>
+              <Text
+                style={[
+                  styles.locationText,
+                  { fontFamily: fontMedium, color: colors.text.secondary },
+                ]}
+              >
                 {locationName}
               </Text>
             </View>
@@ -193,23 +196,24 @@ export function PrayerTimesTab() {
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
           {/* Month Navigation */}
           <View style={styles.monthSelector}>
-            <Pressable 
+            <Pressable
               onPress={() => navigateMonth('prev')}
               style={[styles.monthButton, { backgroundColor: colors.surface }]}
             >
               <Ionicons name="chevron-back" size={20} color={colors.text.primary} />
             </Pressable>
-            <Pressable 
-              style={[styles.monthButton, { backgroundColor: colors.primary, flex: 1 }]}
-            >
+            <Pressable style={[styles.monthButton, { backgroundColor: colors.primary, flex: 1 }]}>
               <Text style={[styles.monthText, { fontFamily: fontSemiBold, color: '#FFF' }]}>
                 {monthName}
               </Text>
             </Pressable>
-            <Pressable 
+            <Pressable
               onPress={() => navigateMonth('next')}
               style={[styles.monthButton, { backgroundColor: colors.surface }]}
             >
@@ -218,9 +222,9 @@ export function PrayerTimesTab() {
           </View>
 
           {/* Days Selector */}
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false} 
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.daysSelector}
           >
             {weeklyTimings.map((day, index) => {
@@ -233,29 +237,33 @@ export function PrayerTimesTab() {
                   key={index}
                   onPress={() => setSelectedDayIndex(index)}
                   style={[
-                    styles.dayCard, 
-                    { 
+                    styles.dayCard,
+                    {
                       backgroundColor: isSelected ? colors.primary : colors.surface,
-                      borderColor: isSelected ? colors.primary : isDark ? '#374151' : '#E5E7EB'
-                    }
+                      borderColor: isSelected ? colors.primary : isDark ? '#374151' : '#E5E7EB',
+                    },
                   ]}
                 >
-                  <Text style={[
-                    styles.dayName, 
-                    { 
-                      fontFamily: fontMedium,
-                      color: isSelected ? '#FFF' : colors.text.secondary 
-                    }
-                  ]}>
+                  <Text
+                    style={[
+                      styles.dayName,
+                      {
+                        fontFamily: fontMedium,
+                        color: isSelected ? '#FFF' : colors.text.secondary,
+                      },
+                    ]}
+                  >
                     {dayName}
                   </Text>
-                  <Text style={[
-                    styles.dayNum, 
-                    { 
-                      fontFamily: fontBold,
-                      color: isSelected ? '#FFF' : colors.text.primary 
-                    }
-                  ]}>
+                  <Text
+                    style={[
+                      styles.dayNum,
+                      {
+                        fontFamily: fontBold,
+                        color: isSelected ? '#FFF' : colors.text.primary,
+                      },
+                    ]}
+                  >
                     {dayNum}
                   </Text>
                 </Pressable>
@@ -265,9 +273,9 @@ export function PrayerTimesTab() {
 
           {/* Selected Day Detail */}
           {weeklyTimings[selectedDayIndex] && (
-            <Animated.View 
+            <Animated.View
               key={selectedDayIndex}
-              entering={FadeInUp.springify()} 
+              entering={FadeInUp.springify()}
               style={styles.dayDetailContainer}
             >
               <LinearGradient
@@ -275,7 +283,9 @@ export function PrayerTimesTab() {
                 style={styles.dateCard}
               >
                 <Text style={[styles.hijriDate, { fontFamily: fontSemiBold }]}>
-                  {weeklyTimings[selectedDayIndex].date.hijri.day} {weeklyTimings[selectedDayIndex].date.hijri.month.en} {weeklyTimings[selectedDayIndex].date.hijri.year}
+                  {weeklyTimings[selectedDayIndex].date.hijri.day}{' '}
+                  {weeklyTimings[selectedDayIndex].date.hijri.month.en}{' '}
+                  {weeklyTimings[selectedDayIndex].date.hijri.year}
                 </Text>
                 <Text style={[styles.gregorianDate, { fontFamily: fontRegular }]}>
                   {weeklyTimings[selectedDayIndex].date.readable}
@@ -286,46 +296,56 @@ export function PrayerTimesTab() {
                 {prayers.map((prayer, i) => {
                   const time = formatTime(weeklyTimings[selectedDayIndex].timings[prayer]);
                   const isNext = i === 1; // Highlight Dhuhr as example
-                  
+
                   return (
-                    <View 
-                      key={prayer} 
+                    <View
+                      key={prayer}
                       style={[
-                        styles.timeRow, 
-                        { 
+                        styles.timeRow,
+                        {
                           backgroundColor: isNext ? colors.primary : colors.surface,
                           borderBottomWidth: i === prayers.length - 1 ? 0 : 1,
-                          borderBottomColor: isDark ? '#374151' : '#F3F4F6'
-                        }
+                          borderBottomColor: isDark ? '#374151' : '#F3F4F6',
+                        },
                       ]}
                     >
                       <View style={styles.timeInfo}>
                         <View style={[styles.radioButton, isNext && styles.radioButtonActive]}>
                           {isNext && <View style={styles.radioButtonInner} />}
                         </View>
-                        <Ionicons 
-                          name={prayerIcons[prayer]} 
-                          size={22} 
-                          color={isNext ? '#FFF' : colors.primary} 
+                        <Ionicons
+                          name={prayerIcons[prayer]}
+                          size={22}
+                          color={isNext ? '#FFF' : colors.primary}
                         />
-                        <Text style={[styles.timeName, { 
-                          fontFamily: fontMedium, 
-                          color: isNext ? '#FFF' : colors.text.primary 
-                        }]}>
+                        <Text
+                          style={[
+                            styles.timeName,
+                            {
+                              fontFamily: fontMedium,
+                              color: isNext ? '#FFF' : colors.text.primary,
+                            },
+                          ]}
+                        >
                           {prayer}
                         </Text>
                       </View>
                       <View style={styles.timeRight}>
-                        <Text style={[styles.timeValue, { 
-                          fontFamily: fontBold, 
-                          color: isNext ? '#FFF' : colors.text.primary 
-                        }]}>
+                        <Text
+                          style={[
+                            styles.timeValue,
+                            {
+                              fontFamily: fontBold,
+                              color: isNext ? '#FFF' : colors.text.primary,
+                            },
+                          ]}
+                        >
                           {time}
                         </Text>
-                        <Ionicons 
-                          name={isNext ? 'volume-high' : 'volume-mute'} 
-                          size={18} 
-                          color={isNext ? '#FFF' : colors.text.disabled} 
+                        <Ionicons
+                          name={isNext ? 'volume-high' : 'volume-mute'}
+                          size={18}
+                          color={isNext ? '#FFF' : colors.text.disabled}
                         />
                       </View>
                     </View>

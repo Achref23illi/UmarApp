@@ -1,21 +1,158 @@
+import { toast } from '@/components/ui/Toast';
 import { Colors } from '@/config/colors';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
 import { challengeDetailsService } from '@/services/challengeDetailsService';
 import { useAppSelector } from '@/store/hooks';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+type DayOption = {
+  key: string;
+  label: string;
+  full: string;
+};
+
+const DAYS: DayOption[] = [
+  { key: 'L', label: 'L', full: 'Lundi' },
+  { key: 'Ma', label: 'M', full: 'Mardi' },
+  { key: 'Me', label: 'M', full: 'Mercredi' },
+  { key: 'J', label: 'J', full: 'Jeudi' },
+  { key: 'V', label: 'V', full: 'Vendredi' },
+  { key: 'S', label: 'S', full: 'Samedi' },
+  { key: 'D', label: 'D', full: 'Dimanche' },
+];
+
+const LIMITS = {
+  daysCount: { min: 1, max: 90 },
+  exercisesCount: { min: 1, max: 20 },
+  duration: { min: 1, max: 120 },
+} as const;
+
+type CounterSettingProps = {
+  label: string;
+  hint: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (nextValue: number) => void;
+  fontBold: string;
+  fontMedium: string;
+  fontRegular: string;
+  colors: ReturnType<typeof useTheme>['colors'];
+};
+
+function CounterSetting({
+  label,
+  hint,
+  value,
+  min,
+  max,
+  onChange,
+  fontBold,
+  fontMedium,
+  fontRegular,
+  colors,
+}: CounterSettingProps) {
+  const canDecrease = value > min;
+  const canIncrease = value < max;
+
+  return (
+    <View style={styles.settingRow}>
+      <View style={{ flex: 1, paddingRight: 10 }}>
+        <Text style={[styles.settingLabel, { fontFamily: fontBold, color: colors.text.primary }]}>
+          {label}
+        </Text>
+        <Text style={[styles.settingHint, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+          {hint}
+        </Text>
+      </View>
+
+      <View style={[styles.counterContainer, { borderColor: colors.border, backgroundColor: colors.surfaceHighlight }]}> 
+        <Pressable
+          onPress={() => canDecrease && onChange(value - 1)}
+          disabled={!canDecrease}
+          style={[styles.counterButton, !canDecrease && styles.counterButtonDisabled]}
+        >
+          <Ionicons
+            name="remove"
+            size={18}
+            color={canDecrease ? Colors.palette.purple.primary : colors.text.secondary}
+          />
+        </Pressable>
+
+        <Text style={[styles.counterValue, { fontFamily: fontMedium, color: colors.text.primary }]}>{value}</Text>
+
+        <Pressable
+          onPress={() => canIncrease && onChange(value + 1)}
+          disabled={!canIncrease}
+          style={[styles.counterButton, !canIncrease && styles.counterButtonDisabled]}
+        >
+          <Ionicons
+            name="add"
+            size={18}
+            color={canIncrease ? Colors.palette.purple.primary : colors.text.secondary}
+          />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+type ToggleSettingProps = {
+  label: string;
+  hint: string;
+  value: boolean;
+  onChange: (nextValue: boolean) => void;
+  fontBold: string;
+  fontRegular: string;
+  colors: ReturnType<typeof useTheme>['colors'];
+};
+
+function ToggleSetting({
+  label,
+  hint,
+  value,
+  onChange,
+  fontBold,
+  fontRegular,
+  colors,
+}: ToggleSettingProps) {
+  return (
+    <View style={styles.settingRow}>
+      <View style={{ flex: 1, paddingRight: 10 }}>
+        <Text style={[styles.settingLabel, { fontFamily: fontBold, color: colors.text.primary }]}>{label}</Text>
+        <Text style={[styles.settingHint, { fontFamily: fontRegular, color: colors.text.secondary }]}>{hint}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ false: '#CED0D5', true: 'rgba(103, 15, 164, 0.35)' }}
+        thumbColor={value ? Colors.palette.purple.primary : '#FFFFFF'}
+      />
+    </View>
+  );
+}
 
 export default function ChallengeConfigScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const { colors } = useTheme();
-  
+
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
   const fontBold = getFont(currentLanguage, 'bold');
   const fontMedium = getFont(currentLanguage, 'medium');
@@ -31,20 +168,27 @@ export default function ChallengeConfigScreen() {
     return typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : '';
   }, [params]);
 
-  // State
+  const source = useMemo(() => {
+    const raw = (params as any)?.source;
+    return typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : '';
+  }, [params]);
+
   const [daysCount, setDaysCount] = useState(9);
   const [exercisesCount, setExercisesCount] = useState(2);
   const [duration, setDuration] = useState(5);
-  // Default selected days: none
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
-  
   const [notifications, setNotifications] = useState(true);
   const [reminders, setReminders] = useState(true);
   const [arabic, setArabic] = useState(true);
 
+  const [hasSavedBackendSettings, setHasSavedBackendSettings] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
+
+  const horizontalPadding = width < 360 ? 14 : 20;
+  const chipSize = width < 360 ? 36 : 44;
 
   useEffect(() => {
     let isActive = true;
@@ -54,9 +198,16 @@ export default function ChallengeConfigScreen() {
         setIsLoading(true);
         setLoadError(null);
 
-        if (!levelId) return;
+        if (!levelId) {
+          setHasSavedBackendSettings(false);
+          return;
+        }
 
-        const settings = await challengeDetailsService.getSettingsForLevel(levelId);
+        const [settings, configuredIds] = await Promise.all([
+          challengeDetailsService.getSettingsForLevel(levelId),
+          challengeDetailsService.getConfiguredLevelIds([levelId]),
+        ]);
+
         if (!isActive) return;
 
         setDaysCount(settings.daysCount);
@@ -66,10 +217,11 @@ export default function ChallengeConfigScreen() {
         setNotifications(settings.notifications);
         setReminders(settings.reminders);
         setArabic(settings.arabic);
+        setHasSavedBackendSettings(configuredIds.includes(levelId));
       } catch (error) {
         console.error('Failed to load challenge settings:', error);
         if (!isActive) return;
-        setLoadError('Unable to load settings');
+        setLoadError('Impossible de charger les reglages.');
       } finally {
         if (!isActive) return;
         setIsLoading(false);
@@ -81,233 +233,308 @@ export default function ChallengeConfigScreen() {
     return () => {
       isActive = false;
     };
-  }, [levelId]);
-
-  // Helper for counters
-  const Counter = ({ value, setValue, min = 1 }: any) => (
-    <View style={styles.counterContainer}>
-      <TouchableOpacity 
-        style={styles.counterBtn} 
-        onPress={() => setValue(Math.max(min, value - 1))}
-      >
-        <Text style={styles.counterBtnText}>-</Text>
-      </TouchableOpacity>
-      <Text style={[styles.counterValue, { fontFamily: fontBold }]}>{value}</Text>
-      <TouchableOpacity 
-        style={styles.counterBtn} 
-        onPress={() => setValue(value + 1)}
-      >
-         <Text style={styles.counterBtnText}>+</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  const handleStart = () => {
-    (async () => {
-      try {
-        if (!levelId) return;
-        setIsSaving(true);
-
-        const level = await challengeDetailsService.getLevelById(levelId);
-        if (!level) throw new Error('Level not found');
-
-        await challengeDetailsService.saveSettingsForLevel({
-          levelId,
-          categoryId: level.categoryId,
-          settings: {
-            daysCount,
-            exercisesCount,
-            durationMinutes: duration,
-            selectedDays,
-            notifications,
-            reminders,
-            arabic,
-          },
-        });
-
-        router.push({
-          pathname: '/challenge-details/level/[id]',
-          params: { id: levelId, challengeSlug },
-        });
-      } catch (error) {
-        console.error('Failed to start challenge:', error);
-      } finally {
-        setIsSaving(false);
-      }
-    })();
-  };
-
-  const DAYS = [
-    { key: 'L', label: 'L', full: 'Lundi' },
-    { key: 'Ma', label: 'M', full: 'Mardi' },
-    { key: 'Me', label: 'M', full: 'Mercredi' },
-    { key: 'J', label: 'J', full: 'Jeudi' },
-    { key: 'V', label: 'V', full: 'Vendredi' },
-    { key: 'S', label: 'S', full: 'Samedi' },
-    { key: 'D', label: 'D', full: 'Dimanche' },
-  ];
+  }, [levelId, reloadNonce]);
 
   const toggleDay = (key: string) => {
-    if (selectedDays.includes(key)) {
-        setSelectedDays(selectedDays.filter(k => k !== key));
-    } else {
-        setSelectedDays([...selectedDays, key]);
+    setSelectedDays((previous) =>
+      previous.includes(key) ? previous.filter((item) => item !== key) : [...previous, key]
+    );
+  };
+
+  const selectedDaysLabel = useMemo(() => {
+    const sorted = DAYS.filter((day) => selectedDays.includes(day.key));
+    if (sorted.length === DAYS.length) return 'Tous les jours';
+    if (sorted.length === 0) return 'Aucun jour selectionne';
+    return sorted.map((day) => day.full).join(', ');
+  }, [selectedDays]);
+
+  const handleSave = async () => {
+    try {
+      if (!levelId) return;
+      setIsSaving(true);
+
+      const level = await challengeDetailsService.getLevelById(levelId);
+      if (!level) throw new Error('Level not found');
+
+      await challengeDetailsService.saveSettingsForLevel({
+        levelId,
+        categoryId: level.categoryId,
+        settings: {
+          daysCount,
+          exercisesCount,
+          durationMinutes: duration,
+          selectedDays,
+          notifications,
+          reminders,
+          arabic,
+        },
+      });
+
+      setHasSavedBackendSettings(true);
+      toast.show({ message: 'Reglages enregistres', type: 'success' });
+
+      if (source === 'level') {
+        router.back();
+        return;
+      }
+
+      router.replace({
+        pathname: '/challenge-details/level/[id]',
+        params: { id: levelId, challengeSlug },
+      });
+    } catch (error) {
+      console.error('Failed to save challenge settings:', error);
+      toast.show({ message: 'Impossible d enregistrer les reglages', type: 'error' });
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const getSelectedDaysString = () => {
-    // Sort based on DAYS order to ensure consistent checking
-    const sorted = DAYS.filter(d => selectedDays.includes(d.key));
-    
-    if (sorted.length === DAYS.length) return 'Tous les jours';
-    if (sorted.length === 0) return 'Aucun jour';
-    
-    return sorted.map(d => d.full).join(', ');
-  };
-
   return (
-     <LinearGradient
-        colors={[Colors.palette.purple.primary, '#E6B980', '#FDFBF7']}
-        locations={[0, 0.6, 1]}
-        style={[styles.container, { paddingTop: insets.top + 20 }]}
-     >
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.3)' }]} />
-        {/* Header - Config Title */}
-        <View style={styles.header}>
-            <View style={{ flex: 1 }} />
-            <Text style={[styles.title, { fontFamily: fontBold }]}>Quelques petits réglages</Text>
-            <Pressable onPress={() => router.back()} style={styles.closeButton}>
-                <Ionicons name="information-circle" size={24} color="rgba(255,255,255,0.3)" />
-            </Pressable>
+    <View style={[styles.container, { backgroundColor: Colors.palette.neutral.gray100 }]}> 
+      <View style={[styles.header, { paddingTop: insets.top + 6, paddingHorizontal: horizontalPadding }]}>
+        <Pressable
+          onPress={() => router.back()}
+          style={[styles.iconButton, { borderColor: colors.border, backgroundColor: colors.surface }]}
+        >
+          <Ionicons name="arrow-back" size={20} color={colors.text.primary} />
+        </Pressable>
+
+        <View style={styles.headerTextBlock}>
+          <Text style={[styles.headerTitle, { fontFamily: fontBold, color: colors.text.primary }]}>Parametres du niveau</Text>
+          <Text style={[styles.headerSubtitle, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+            Reglages reels relies a votre compte
+          </Text>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-              {isLoading ? (
-                <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-                  <ActivityIndicator size="large" color="#FFF" />
-                </View>
-              ) : loadError ? (
-                <View style={{ paddingVertical: 24 }}>
-                  <Text style={[styles.label, { fontFamily: fontBold }]}>{loadError}</Text>
-                </View>
-              ) : null}
+        <View style={{ width: 42 }} />
+      </View>
 
-              {/* Days Count */}
-              <View style={styles.row}>
-                 <Text style={[styles.label, { fontFamily: fontMedium }]}>Sur combien de jour ?</Text>
-                 <Counter value={daysCount} setValue={setDaysCount} />
-              </View>
-              <View style={styles.divider} />
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: horizontalPadding,
+          paddingBottom: insets.bottom + 120,
+          gap: 14,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        {isLoading ? (
+          <View style={styles.loadingState}>
+            <ActivityIndicator size="large" color={Colors.palette.purple.primary} />
+          </View>
+        ) : null}
 
+        {!isLoading && loadError ? (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+            <View style={styles.errorRow}>
+              <Ionicons name="warning-outline" size={18} color={Colors.palette.semantic.warning} />
+              <Text style={[styles.errorText, { fontFamily: fontMedium, color: colors.text.primary }]}>{loadError}</Text>
+            </View>
+            <Pressable
+              onPress={() => {
+                setLoadError(null);
+                setReloadNonce((value) => value + 1);
+              }}
+              style={[styles.retryButton, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.retryText, { fontFamily: fontMedium, color: colors.text.primary }]}>Reessayer</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
-
-              {/* Days Selector */}
-              <View style={styles.daysContainer}>
-                  <View style={styles.daysRow}>
-                    {DAYS.map((day) => {
-                        const isSelected = selectedDays.includes(day.key);
-                        return (
-                            <TouchableOpacity 
-                                key={day.key} 
-                                style={[
-                                    styles.dayCircle, 
-                                    { 
-                                        backgroundColor: isSelected ? '#FFF' : 'rgba(255,255,255,0.1)',
-                                        borderWidth: isSelected ? 0 : 1,
-                                        borderColor: 'rgba(255,255,255,0.5)'
-                                    }
-                                ]} 
-                                onPress={() => toggleDay(day.key)}
-                            >
-                                <Text style={[
-                                    styles.dayText, 
-                                    { 
-                                        fontFamily: fontBold, 
-                                        color: isSelected ? Colors.palette.purple.primary : '#FFF' 
-                                    }
-                                ]}>
-                                    {day.label}
-                                </Text>
-                            </TouchableOpacity>
-                        );
-                    })}
-                  </View>
-                 <Text style={[styles.daysLabel, { fontFamily: fontMedium, color: '#FFF' }]}>{getSelectedDaysString()}</Text>
-              </View>
-               <View style={styles.divider} />
-
-               {/* Exercises Count */}
-               <View style={styles.row}>
-                 <Text style={[styles.label, { fontFamily: fontMedium }]}>Nombre d'exercice quotidien ?</Text>
-                 <Counter value={exercisesCount} setValue={setExercisesCount} />
-              </View>
-              <View style={styles.divider} />
-
-               {/* Duration */}
-               <View style={styles.row}>
-                 <Text style={[styles.label, { fontFamily: fontMedium }]}>Durée des exercices (en minute) ?</Text>
-                 <Counter value={duration} setValue={setDuration} />
-              </View>
-              <View style={styles.divider} />
-
-               {/* Toggles */}
-                <View style={[styles.row, { alignItems: 'center' }]}>
-                   <View style={{ flex: 1 }}>
-                      <Text style={[styles.label, { fontFamily: fontBold }]}>Notification</Text>
-                      <Text style={[styles.subLabel, { fontFamily: fontRegular }]}>Pastilles, Alarme, Bannière, Vibreur</Text>
-                   </View>
-                   <Switch 
-                      value={notifications} 
-                      onValueChange={setNotifications} 
-                      trackColor={{ false: "#767577", true: "#FFD580" }}
-                      thumbColor={notifications ? "#FFF" : "#f4f3f4"}
-                   />
-                </View>
-                <View style={styles.divider} />
-                
-                <View style={[styles.row, { alignItems: 'center' }]}>
-                   <View style={{ flex: 1 }}>
-                      <Text style={[styles.label, { fontFamily: fontBold }]}>Rappel</Text>
-                      <Text style={[styles.subLabel, { fontFamily: fontRegular }]}>Toutes les 5 minutes</Text>
-                   </View>
-                   <Switch 
-                      value={reminders} 
-                      onValueChange={setReminders} 
-                      trackColor={{ false: "#767577", true: "#FFD580" }}
-                      thumbColor={reminders ? "#FFF" : "#f4f3f4"}
-                   />
-                </View>
-                <View style={styles.divider} />
-
-                <View style={[styles.row, { alignItems: 'center' }]}>
-                   <View style={{ flex: 1 }}>
-                      <Text style={[styles.label, { fontFamily: fontBold }]}>Langue Arabe</Text>
-                      <Text style={[styles.subLabel, { fontFamily: fontRegular }]}>Activé</Text>
-                   </View>
-                   <Switch 
-                      value={arabic} 
-                      onValueChange={setArabic} 
-                      trackColor={{ false: "#767577", true: "#FFD580" }}
-                      thumbColor={arabic ? "#FFF" : "#f4f3f4"}
-                   />
-                </View>
-                <View style={[styles.divider, { marginBottom: 30 }]} />
-
-           </ScrollView>
-
-           <View style={{ padding: 20, alignItems: 'center', paddingBottom: insets.bottom + 20 }}>
-               <TouchableOpacity style={[styles.startButton, isSaving && { opacity: 0.7 }]} onPress={handleStart} disabled={isSaving}>
-                  <LinearGradient
-                     colors={[Colors.palette.purple.primary, Colors.palette.purple.light]}
-                     style={styles.startButtonGradient}
-                     start={{ x: 0, y: 0 }}
-                     end={{ x: 1, y: 0 }}
+        {!isLoading && !loadError ? (
+          <>
+            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+              <View style={styles.cardHeaderRow}>
+                <Text style={[styles.cardTitle, { fontFamily: fontBold, color: colors.text.primary }]}>Planification</Text>
+                <View
+                  style={[
+                    styles.savedBadge,
+                    {
+                      backgroundColor: hasSavedBackendSettings
+                        ? 'rgba(76, 175, 80, 0.12)'
+                        : 'rgba(245, 198, 97, 0.2)',
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={hasSavedBackendSettings ? 'cloud-done-outline' : 'cloud-offline-outline'}
+                    size={14}
+                    color={hasSavedBackendSettings ? Colors.palette.semantic.success : Colors.palette.gold.dark}
+                  />
+                  <Text
+                    style={[
+                      styles.savedBadgeText,
+                      {
+                        fontFamily: fontMedium,
+                        color: hasSavedBackendSettings
+                          ? Colors.palette.semantic.success
+                          : Colors.palette.gold.dark,
+                      },
+                    ]}
                   >
-                     <Text style={[styles.startButtonText, { fontFamily: fontBold }]}>{isSaving ? '...' : 'Bismillah'}</Text>
-                  </LinearGradient>
-               </TouchableOpacity>
-           </View>
-     </LinearGradient>
+                    {hasSavedBackendSettings ? 'Sauvegarde backend' : 'Non sauvegarde'}
+                  </Text>
+                </View>
+              </View>
+
+              <CounterSetting
+                label="Sur combien de jours ?"
+                hint="Nombre total de jours du niveau"
+                value={daysCount}
+                min={LIMITS.daysCount.min}
+                max={LIMITS.daysCount.max}
+                onChange={setDaysCount}
+                fontBold={fontBold}
+                fontMedium={fontMedium}
+                fontRegular={fontRegular}
+                colors={colors}
+              />
+
+              <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+
+              <View style={styles.settingBlock}>
+                <Text style={[styles.settingLabel, { fontFamily: fontBold, color: colors.text.primary }]}>Jours de rappel</Text>
+                <View style={styles.dayGrid}>
+                  {DAYS.map((day) => {
+                    const isSelected = selectedDays.includes(day.key);
+                    return (
+                      <Pressable
+                        key={day.key}
+                        onPress={() => toggleDay(day.key)}
+                        style={[
+                          styles.dayChip,
+                          {
+                            width: chipSize,
+                            height: chipSize,
+                            borderRadius: chipSize / 2,
+                            borderColor: isSelected ? Colors.palette.purple.primary : colors.border,
+                            backgroundColor: isSelected ? Colors.palette.purple.primary : colors.surface,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.dayChipText,
+                            {
+                              fontFamily: fontMedium,
+                              color: isSelected ? '#FFFFFF' : colors.text.primary,
+                            },
+                          ]}
+                        >
+                          {day.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <Text style={[styles.daysSummary, { fontFamily: fontRegular, color: colors.text.secondary }]}>
+                  {selectedDaysLabel}
+                </Text>
+              </View>
+
+              <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+
+              <CounterSetting
+                label="Exercices quotidiens"
+                hint="Nombre d'actions a faire chaque jour"
+                value={exercisesCount}
+                min={LIMITS.exercisesCount.min}
+                max={LIMITS.exercisesCount.max}
+                onChange={setExercisesCount}
+                fontBold={fontBold}
+                fontMedium={fontMedium}
+                fontRegular={fontRegular}
+                colors={colors}
+              />
+
+              <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+
+              <CounterSetting
+                label="Duree par exercice"
+                hint="Temps en minutes"
+                value={duration}
+                min={LIMITS.duration.min}
+                max={LIMITS.duration.max}
+                onChange={setDuration}
+                fontBold={fontBold}
+                fontMedium={fontMedium}
+                fontRegular={fontRegular}
+                colors={colors}
+              />
+            </View>
+
+            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+              <Text style={[styles.cardTitle, { fontFamily: fontBold, color: colors.text.primary }]}>Notifications</Text>
+
+              <ToggleSetting
+                label="Notifications"
+                hint="Pastilles, alarmes et bannieres"
+                value={notifications}
+                onChange={setNotifications}
+                fontBold={fontBold}
+                fontRegular={fontRegular}
+                colors={colors}
+              />
+
+              <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+
+              <ToggleSetting
+                label="Rappels"
+                hint="Relance toutes les 5 minutes"
+                value={reminders}
+                onChange={setReminders}
+                fontBold={fontBold}
+                fontRegular={fontRegular}
+                colors={colors}
+              />
+
+              <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+
+              <ToggleSetting
+                label="Langue arabe"
+                hint="Afficher le contenu arabe"
+                value={arabic}
+                onChange={setArabic}
+                fontBold={fontBold}
+                fontRegular={fontRegular}
+                colors={colors}
+              />
+            </View>
+          </>
+        ) : null}
+      </ScrollView>
+
+      <View
+        style={[
+          styles.footer,
+          {
+            paddingHorizontal: horizontalPadding,
+            paddingBottom: insets.bottom + 14,
+            borderTopColor: colors.divider,
+            backgroundColor: colors.surface,
+          },
+        ]}
+      >
+        <Pressable
+          style={[
+            styles.saveButton,
+            { backgroundColor: Colors.palette.purple.primary },
+            (isSaving || isLoading || !!loadError) && styles.saveButtonDisabled,
+          ]}
+          onPress={handleSave}
+          disabled={isSaving || isLoading || !!loadError}
+        >
+          {isSaving ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={[styles.saveButtonText, { fontFamily: fontBold }]}>
+              {source === 'level' ? 'Enregistrer' : 'Enregistrer et continuer'}
+            </Text>
+          )}
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
@@ -316,145 +543,156 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: 20,
-      marginBottom: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 14,
   },
-  closeButton: {
-      flex: 1,
-      alignItems: 'flex-end',
+  iconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
   },
-  title: {
-      fontSize: 18,
-      color: '#FFF',
-      textAlign: 'center',
-      textDecorationLine: 'underline',
-  },
-  content: {
+  headerTextBlock: {
     flex: 1,
+    alignItems: 'center',
   },
-  scrollContent: {
-      paddingHorizontal: 24,
+  headerTitle: {
+    fontSize: 18,
+    textAlign: 'center',
   },
-  row: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingVertical: 12,
+  headerSubtitle: {
+    marginTop: 2,
+    fontSize: 12,
+    textAlign: 'center',
   },
-  label: {
-      color: '#FFF',
-      fontSize: 16,
+  loadingState: {
+    paddingVertical: 44,
+    alignItems: 'center',
   },
-  subLabel: {
-      color: 'rgba(255,255,255,0.7)',
-      fontSize: 12,
+  card: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 16,
+    gap: 14,
   },
-  counterContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
   },
-  counterBtn: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      backgroundColor: '#FFF',
-      alignItems: 'center',
-      justifyContent: 'center',
+  cardTitle: {
+    fontSize: 16,
   },
-  counterBtnText: {
-      fontSize: 20,
-      color: Colors.palette.purple.primary,
-      fontWeight: 'bold',
-      marginTop: -2,
+  savedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
-  counterValue: {
-      fontSize: 18,
-      color: '#FFF',
-      width: 24,
-      textAlign: 'center',
+  savedBadgeText: {
+    fontSize: 11,
+  },
+  settingBlock: {
+    gap: 10,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10,
+  },
+  settingLabel: {
+    fontSize: 14,
+  },
+  settingHint: {
+    marginTop: 3,
+    fontSize: 12,
+    lineHeight: 16,
   },
   divider: {
-      height: 1,
-      backgroundColor: 'rgba(255,255,255,0.2)',
-      width: '100%',
+    height: 1,
+    width: '100%',
   },
-  dateDisplay: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
+  counterContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 2,
   },
-  dateText: {
-      color: Colors.palette.gold.primary,
-      fontSize: 14,
+  counterButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  daysContainer: {
-      paddingVertical: 20,
-      alignItems: 'center',
-      gap: 12,
+  counterButtonDisabled: {
+    opacity: 0.35,
   },
-  daysRow: {
-      flexDirection: 'row',
-      gap: 12,
+  counterValue: {
+    minWidth: 30,
+    textAlign: 'center',
+    fontSize: 16,
   },
-  dayCircle: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      alignItems: 'center',
-      justifyContent: 'center',
+  dayGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
-  dayText: {
-      fontSize: 16,
+  dayChip: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
   },
-  daysLabel: {
-      color: Colors.palette.purple.primary, // Using purple as it seems readable on this background
-      fontSize: 14,
-      opacity: 0.8,
+  dayChipText: {
+    fontSize: 14,
   },
-  timeSlotRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingVertical: 12,
+  daysSummary: {
+    fontSize: 12,
+    lineHeight: 16,
   },
-  timeLabelContainer: {
-      width: '30%',
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  dayName: {
-      fontSize: 24,
-      color: '#FFF',
+  errorText: {
+    flex: 1,
+    fontSize: 14,
   },
-  timeValues: {
-     alignItems: 'flex-end',
-     gap: 4,
+  retryButton: {
+    borderWidth: 1,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  timeText: {
-      fontSize: 32,
-      color: '#FFF',
+  retryText: {
+    fontSize: 12,
   },
-  timeDivider: {
-      width: 1,
-      height: 10, // Not matching image exactly but simulates the separation
+  footer: {
+    borderTopWidth: 1,
+    paddingTop: 12,
   },
-  startButton: {
-      width: '60%',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.2,
-      shadowRadius: 8,
-      elevation: 5,
+  saveButton: {
+    height: 52,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  startButtonGradient: {
-      paddingVertical: 16,
-      borderRadius: 30,
-      alignItems: 'center',
+  saveButtonDisabled: {
+    opacity: 0.65,
   },
-  startButtonText: {
-      color: '#FFF',
-      fontSize: 18,
+  saveButtonText: {
+    color: '#FFF',
+    fontSize: 16,
   },
 });

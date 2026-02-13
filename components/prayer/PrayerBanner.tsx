@@ -21,11 +21,12 @@ export function PrayerBanner({ coords, style }: Props) {
   const fontMedium = getFont(currentLanguage, 'medium');
   const fontSemiBold = getFont(currentLanguage, 'semiBold');
 
-  const { prayerTimes, nextPrayer, hijriDate, gregorianDate, qiyamTimeRemaining, loading } = usePrayerTimes({
-    coords,
-    language: currentLanguage,
-    method: 2, // ISNA (can be swapped if needed)
-  });
+  const { prayerTimes, nextPrayer, hijriDate, gregorianDate, qiyamTimeRemaining, loading } =
+    usePrayerTimes({
+      coords,
+      language: currentLanguage,
+      method: 2, // ISNA (can be swapped if needed)
+    });
 
   const PRIMARY = Colors.palette.purple.primary;
   const GOLD = Colors.palette.purple.primary; // full primary tint
@@ -47,6 +48,9 @@ export function PrayerBanner({ coords, style }: Props) {
             styles.prayerName,
             { fontFamily: fontSemiBold, color: p.isNext ? '#fff' : 'rgba(255,255,255,0.9)' },
           ]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.85}
         >
           {p.name}
         </Text>
@@ -75,7 +79,9 @@ export function PrayerBanner({ coords, style }: Props) {
             <Ionicons name="moon-outline" size={18} color="#fff" />
             <Text style={[styles.bannerText, { fontFamily: fontSemiBold }]}>Qiyam I lail</Text>
           </View>
-          <Text style={[styles.bannerTime, { fontFamily: fontMedium }]}>{qiyamTimeRemaining || '--'}</Text>
+          <Text style={[styles.bannerTime, { fontFamily: fontMedium }]}>
+            {qiyamTimeRemaining || '--'}
+          </Text>
         </View>
 
         <View style={styles.bannerDivider} />
@@ -173,11 +179,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexWrap: 'nowrap',
     justifyContent: 'space-between',
-    columnGap: 6,
+    columnGap: 4,
     width: '100%',
   },
   prayerItem: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 8,
     borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.14)',
