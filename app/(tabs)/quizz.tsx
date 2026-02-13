@@ -1,230 +1,195 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Dimensions, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { toast } from '@/components/ui/Toast';
 import { Colors } from '@/config/colors';
+import { FEATURE_FLAGS } from '@/config/featureFlags';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
+import { QuizMode, quizSessionService } from '@/services/quizSessionService';
 import { useAppSelector } from '@/store/hooks';
 
-const { width } = Dimensions.get('window');
-const CARD_MARGIN = 16;
-const CARD_SIZE = (width - 40 - CARD_MARGIN) / 2;
+type ModeCard = {
+  id: QuizMode;
+  title: string;
+  subtitle: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+};
 
 export default function QuizzScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { t } = useTranslation();
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
-  const currentUser = useAppSelector((state) => state.user);
-  const { colors, isDark } = useTheme();
-  
+  const { colors } = useTheme();
 
-  
   const fontBold = getFont(currentLanguage, 'bold');
   const fontMedium = getFont(currentLanguage, 'medium');
   const fontRegular = getFont(currentLanguage, 'regular');
 
-  // State for mode selection modal
-  const [showModeModal, setShowModeModal] = useState(false);
-  const [selectedMode, setSelectedMode] = useState<string | null>(null);
+  const tr = useCallback(
+    (key: string, fallback: string) => {
+      const translated = t(key);
+      return translated === key ? fallback : translated;
+    },
+    [t]
+  );
 
-  // Quiz modes
-  const modes = [
-    { 
-      id: 'solo', 
-      title: t('quiz.modes.solo'), 
-      subtitle: t('quiz.modes.solo_desc'),
+  const modeCards: ModeCard[] = [
+    {
+      id: 'solo',
+      title: tr('quiz.v2.solo_title', 'Solo Online'),
+      subtitle: tr('quiz.v2.solo_desc', 'Play instantly with backend scoring'),
       icon: 'person',
-      gradient: [Colors.palette.purple.light, Colors.palette.purple.primary] as const,
-      route: '/quiz/level-selection' 
+      color: Colors.palette.purple.primary,
     },
-    { 
-      id: 'duo', 
-      title: t('quiz.modes.duo'), 
-      subtitle: t('quiz.modes.duo_desc'),
+    {
+      id: 'duo',
+      title: tr('quiz.v2.duo_title', 'Duo Online'),
+      subtitle: tr('quiz.v2.duo_desc', 'Create a room and play with one friend'),
       icon: 'people',
-      gradient: [Colors.palette.purple.primary, Colors.palette.purple.dark] as const,
-      route: '/quiz' 
+      color: Colors.palette.purple.dark,
     },
-    { 
-      id: 'equipe', 
-      title: t('quiz.modes.team'), 
-      subtitle: t('quiz.modes.team_desc'),
+    {
+      id: 'group',
+      title: tr('quiz.v2.group_title', 'Group Online'),
+      subtitle: tr('quiz.v2.group_desc', 'Live group quiz for 3 to 8 players'),
       icon: 'people-circle',
-      gradient: [Colors.palette.purple.light, Colors.palette.purple.primary] as const,
-      route: '/challenge' 
+      color: Colors.palette.gold.dark,
     },
-    { 
-      id: 'groupe', 
-      title: t('quiz.modes.group'), 
-      subtitle: t('quiz.modes.group_desc'),
-      icon: 'grid',
-      gradient: [Colors.palette.gold.primary, Colors.palette.gold.dark] as const,
-      route: '/challenge' 
+    {
+      id: 'hotseat',
+      title: tr('quiz.v2.hotseat_title', 'Offline Hot-seat'),
+      subtitle: tr('quiz.v2.hotseat_desc', '2 to 8 players on one device, sync later'),
+      icon: 'phone-portrait',
+      color: '#0EA5E9',
     },
   ];
 
-  const handleModePress = (mode: typeof modes[0]) => {
-    if (mode.id === 'solo') {
-      router.push('/quiz/level-selection');
-    } else {
-      setSelectedMode(mode.id);
-      setShowModeModal(true);
+  const runOfflineSync = useCallback(async () => {
+    try {
+      const result = await quizSessionService.syncOfflineQueue();
+      if (result.synced > 0) {
+        const msg = t('quiz.v2.sync_success', { count: result.synced });
+        toast.show({
+          type: 'success',
+          message: msg === 'quiz.v2.sync_success'
+            ? `Synced ${result.synced} offline game(s).`
+            : msg,
+        });
+      }
+    } catch (error) {
+      console.error('Offline sync failed:', error);
     }
-  };
+  }, [t]);
 
-  const handlePlayModeSelect = (playMode: 'presentiel' | 'distance') => {
-    setShowModeModal(false);
-    
-    if (playMode === 'presentiel') {
-      router.push('/quiz/add-participants');
-    } else {
-      router.push('/quiz/invite-contacts');
+  useFocusEffect(
+    useCallback(() => {
+      void runOfflineSync();
+    }, [runOfflineSync])
+  );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void runOfflineSync();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [runOfflineSync]);
+
+  const handleModePress = (mode: QuizMode) => {
+    if (!FEATURE_FLAGS.quizV2) {
+      router.push('/quiz/level-selection');
+      return;
     }
+    router.push({ pathname: '/quiz/game-settings', params: { mode } });
   };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      
-      {/* Header Section */}
-      <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <View>
           <Text style={[styles.headerTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
-            {t('quiz.title')}
+            {tr('quiz.v2.title', 'Quiz Arena')}
           </Text>
-          <Text style={[styles.headerSubtitle, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-            {t('quiz.subtitle')}
+          <Text
+            style={[
+              styles.headerSubtitle,
+              { fontFamily: fontRegular, color: colors.text.secondary },
+            ]}
+          >
+            {tr(
+              'quiz.v2.subtitle',
+              'Realtime backend sessions for solo, duo, group and offline hot-seat'
+            )}
           </Text>
         </View>
-        <Pressable 
-          style={[styles.settingsButton, { backgroundColor: colors.surfaceHighlight }]}
-          onPress={() => router.push('/settings')}
+
+        <Pressable
+          style={[styles.joinButton, { backgroundColor: colors.surface }]}
+          onPress={() => router.push('/quiz/join-room')}
         >
-          <Ionicons name="settings-outline" size={24} color={colors.icon} />
+          <Ionicons name="log-in-outline" size={20} color={colors.primary} />
+          <Text style={[styles.joinButtonText, { fontFamily: fontMedium, color: colors.primary }]}>
+            {tr('quiz.v2.join_room', 'Join room')}
+          </Text>
         </Pressable>
       </View>
 
-      {/* Main Content */}
-      <View style={styles.gridContainer}>
-        {modes.map((mode, index) => (
-          <Animated.View
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {modeCards.map((mode) => (
+          <Pressable
             key={mode.id}
-            entering={FadeInDown.delay(index * 100).springify()}
-            style={styles.cardWrapper}
+            style={[
+              styles.modeCard,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+            onPress={() => handleModePress(mode.id)}
           >
-            <Pressable
-              style={({ pressed }) => [
-                styles.card,
-                { transform: [{ scale: pressed ? 0.98 : 1 }] }
-              ]}
-              onPress={() => handleModePress(mode)}
-            >
-              <LinearGradient
-                colors={mode.gradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.cardGradient}
+            <View style={[styles.iconBox, { backgroundColor: `${mode.color}22` }]}>
+              <Ionicons name={mode.icon} size={28} color={mode.color} />
+            </View>
+
+            <View style={styles.modeContent}>
+              <Text
+                style={[styles.modeTitle, { fontFamily: fontBold, color: colors.text.primary }]}
               >
-                <View style={styles.cardIconContainer}>
-                  <Ionicons name={mode.icon as any} size={32} color="#FFF" />
-                </View>
-                <View>
-                  <Text style={[styles.cardTitle, { fontFamily: fontBold }]}>
-                    {mode.title}
-                  </Text>
-                  <Text style={[styles.cardSubtitle, { fontFamily: fontMedium }]}>
-                    {mode.subtitle}
-                  </Text>
-                </View>
-                
-                {/* Decorative circle */}
-                <View style={styles.decorativeCircle} />
-              </LinearGradient>
-            </Pressable>
-          </Animated.View>
+                {mode.title}
+              </Text>
+              <Text
+                style={[
+                  styles.modeSubtitle,
+                  { fontFamily: fontRegular, color: colors.text.secondary },
+                ]}
+              >
+                {mode.subtitle}
+              </Text>
+            </View>
+
+            <Ionicons name="chevron-forward" size={22} color={colors.text.secondary} />
+          </Pressable>
         ))}
-      </View>
 
-      {/* Play Mode Selection Modal */}
-      <Modal
-        visible={showModeModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowModeModal(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setShowModeModal(false)}>
-          <Animated.View 
-            entering={FadeInDown.springify()}
-            style={[styles.modalContent, { backgroundColor: colors.surface }]}
+        <View style={[styles.noteCard, { backgroundColor: colors.surfaceHighlight || '#F3F4F6' }]}>
+          <Ionicons name="information-circle" size={20} color={colors.primary} />
+          <Text
+            style={[styles.noteText, { fontFamily: fontRegular, color: colors.text.secondary }]}
           >
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
-                {t('quiz.play_style.title')}
-              </Text>
-              <Text style={[styles.modalSubtitle, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-                {t('quiz.play_style.subtitle')}
-              </Text>
-            </View>
-
-            <View style={styles.modalOptionsContainer}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.modalOption,
-                  { 
-                    backgroundColor: colors.surfaceHighlight,
-                    transform: [{ scale: pressed ? 0.98 : 1 }]
-                  }
-                ]}
-                onPress={() => handlePlayModeSelect('presentiel')}
-              >
-                <View style={[styles.modalIconBox, { backgroundColor: Colors.palette.purple.light }]}>
-                  <Ionicons name="location" size={24} color="#FFF" />
-                </View>
-                <View style={styles.modalOptionText}>
-                  <Text style={[styles.modalOptionTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
-                    {t('quiz.play_style.face_to_face')}
-                  </Text>
-                  <Text style={[styles.modalOptionDesc, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-                    {t('quiz.play_style.face_to_face_desc')}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={24} color={colors.icon} />
-              </Pressable>
-
-              <Pressable
-                style={({ pressed }) => [
-                  styles.modalOption,
-                  { 
-                    backgroundColor: colors.surfaceHighlight,
-                    transform: [{ scale: pressed ? 0.98 : 1 }]
-                  }
-                ]}
-                onPress={() => handlePlayModeSelect('distance')}
-              >
-                <View style={[styles.modalIconBox, { backgroundColor: Colors.palette.purple.dark }]}>
-                  <Ionicons name="phone-portrait" size={24} color="#FFF" />
-                </View>
-                <View style={styles.modalOptionText}>
-                  <Text style={[styles.modalOptionTitle, { fontFamily: fontBold, color: colors.text.primary }]}>
-                    {t('quiz.play_style.remote')}
-                  </Text>
-                  <Text style={[styles.modalOptionDesc, { fontFamily: fontRegular, color: colors.text.secondary }]}>
-                    {t('quiz.play_style.remote_desc')}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={24} color={colors.icon} />
-              </Pressable>
-            </View>
-          </Animated.View>
-        </Pressable>
-      </Modal>
-
+            {tr(
+              'quiz.v2.note',
+              'Online modes use Supabase Realtime. Offline mode stores local results and syncs automatically when connected.'
+            )}
+          </Text>
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -234,132 +199,76 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    gap: 14,
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: 30,
     marginBottom: 4,
   },
   headerSubtitle: {
-    fontSize: 16,
+    fontSize: 14,
+    lineHeight: 20,
   },
-  settingsButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  gridContainer: {
+  joinButton: {
+    alignSelf: 'flex-start',
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 20,
-    gap: CARD_MARGIN,
-    justifyContent: 'center',
-  },
-  cardWrapper: {
-    width: CARD_SIZE,
-    height: CARD_SIZE * 1.2,
-  },
-  card: {
-    flex: 1,
-    borderRadius: 24,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  cardGradient: {
-    flex: 1,
-    borderRadius: 24,
-    padding: 20,
-    justifyContent: 'space-between',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  cardIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 15,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
     alignItems: 'center',
+    gap: 8,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: 'rgba(0,0,0,0.05)',
   },
-  cardTitle: {
-    fontSize: 20,
-    color: '#FFF',
-    marginBottom: 4,
-  },
-  cardSubtitle: {
+  joinButtonText: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
   },
-  decorativeCircle: {
-    position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    top: -20,
-    right: -20,
+  content: {
+    paddingHorizontal: 20,
+    paddingBottom: 34,
+    gap: 12,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    padding: 24,
-    paddingBottom: 40,
-  },
-  modalHeader: {
-    marginBottom: 32,
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  modalSubtitle: {
-    fontSize: 16,
-  },
-  modalOptionsContainer: {
-    gap: 16,
-  },
-  modalOption: {
+  modeCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
-    borderRadius: 20,
+    gap: 12,
   },
-  modalIconBox: {
-    width: 50,
-    height: 50,
-    borderRadius: 15,
-    justifyContent: 'center',
+  iconBox: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
     alignItems: 'center',
-    marginRight: 16,
+    justifyContent: 'center',
   },
-  modalOptionText: {
+  modeContent: {
     flex: 1,
   },
-  modalOptionTitle: {
-    fontSize: 18,
+  modeTitle: {
+    fontSize: 17,
     marginBottom: 4,
   },
-  modalOptionDesc: {
-    fontSize: 14,
+  modeSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  noteCard: {
+    marginTop: 6,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  noteText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
   },
 });

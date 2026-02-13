@@ -70,6 +70,8 @@
     "register": {
       "title": "Créer un Compte",
       "subtitle": "Rejoignez notre communauté de croyants",
+      "completeProfile": "Complétez Votre Profil",
+      "completeProfileSubtitle": "Juste quelques détails de plus pour commencer",
       "genderModal": {
         "title": "Êtes-vous ?",
         "confirm": "Valider"
@@ -85,6 +87,8 @@
       "signUp": "Créer le Compte",
       "haveAccount": "Vous avez déjà un compte ?",
       "signIn": "Se Connecter",
+      "selectGender": "Sélectionner le Genre",
+      "getStarted": "Commencer",
       "terms": "En créant un compte, vous acceptez nos",
       "termsLink": "Conditions et Politique de Confidentialité",
       "selectCountry": "Sélectionner un Pays",
@@ -255,6 +259,44 @@
     "nextQuestion": "Question suivante",
     "finish": "Terminer",
     "subtitle": "Choisissez votre mode de jeu",
+    "v2": {
+      "title": "Arène de Quiz",
+      "subtitle": "Sessions en temps réel pour solo, duo, groupe et hot-seat hors ligne",
+      "solo_title": "Solo en ligne",
+      "solo_desc": "Jouez instantanément avec un score en ligne",
+      "duo_title": "Duo en ligne",
+      "duo_desc": "Créez une salle et jouez avec un ami",
+      "group_title": "Groupe en ligne",
+      "group_desc": "Quiz en groupe de 3 à 8 joueurs",
+      "hotseat_title": "Hot-seat hors ligne",
+      "hotseat_desc": "2 à 8 joueurs sur un appareil, synchronisé plus tard",
+      "join_room": "Rejoindre une salle",
+      "join_room_desc": "Entrez le code de salle à 6 caractères et votre nom.",
+      "join_now": "Rejoindre",
+      "create_room": "Créer une salle",
+      "sync_success": "{{count}} partie(s) hors ligne synchronisée(s).",
+      "note": "Les modes en ligne utilisent Supabase Realtime. Le mode hors ligne stocke les résultats localement et synchronise automatiquement une fois connecté.",
+      "no_themes": "Aucun thème n'a assez de questions actives pour cette configuration.",
+      "load_error": "Impossible de charger cette session de quiz.",
+      "missing_session": "Détails de session manquants.",
+      "turn": "Tour",
+      "auto_next": "Tour suivant automatique",
+      "player_switch": "Changement de joueur",
+      "pass_phone_to": "Passe le téléphone à",
+      "handoff_continue": "Continuer",
+      "used_this_question": "Utilisé pour cette question",
+      "left": "restant(s)",
+      "duo_lobby": "Salon Duo",
+      "group_lobby": "Salon Groupe",
+      "lobby_waiting": "Partagez le code et attendez les joueurs.",
+      "code_copied": "Code de salle copié",
+      "min_players": "Au moins {{count}} requis",
+      "online": "En ligne",
+      "offline": "Hors ligne",
+      "local_player": "Joueur local",
+      "start_game": "Lancer la partie",
+      "waiting_host": "En attente du lancement par l'hôte..."
+    },
     "modes": {
       "solo": "Solo",
       "solo_desc": "Jouez seul",
@@ -301,26 +343,41 @@
     "game": {
       "theme_label": "Thème :",
       "question_label": "Question",
-      "points_label": "Points"
+      "points_label": "Points",
+      "time": "Temps",
+      "answered": "Répondu",
+      "seat": "Siège"
     },
     "results": {
       "congrats": "Félicitations",
-      "score_label": "SCORE",
+      "score_label": "Score",
       "theme_label": "Thème :",
+      "mode_label": "Mode",
+      "questions_label": "Questions",
+      "leaderboard": "Classement",
+      "no_data": "Aucun résultat disponible.",
+      "back_to_menu": "Retour au menu quiz",
       "ranking": "Voir le classement",
       "new_game": "Nouvelle partie",
-      "menu": "Retour au menu"
+      "menu": "Menu quiz"
     },
     "back": "Revenir",
     "validate": "Valider",
     "selected_theme_label": "Vous avez sélectionné le thème :",
     "settings": {
       "title": "Paramètres de jeu",
+      "theme": "Thème",
+      "rules": "Règles",
       "response_time": "Temps de réponse",
       "questions_count": "Nombre de questions",
       "jokers_count": "Nombre de jokers",
       "helps_count": "Nombre d'aides",
-      "start": "Commencer"
+      "start": "Commencer",
+      "offline_players": "Joueurs hors ligne",
+      "player_count": "Nombre de joueurs",
+      "available": "disponible(s)",
+      "room_code": "Code de salle",
+      "display_name": "Nom affiché"
     },
     "challenges": {
       "title": "Challenges",
@@ -577,4 +634,3 @@
     "emptyState": "Aucun commentaire. Soyez le premier !"
   }
 }
-

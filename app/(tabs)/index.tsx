@@ -23,8 +23,8 @@ import { InfiniteFeed } from '@/components/feed/InfiniteFeed';
 import { PrayerBanner } from '@/components/prayer/PrayerBanner';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
-import { socialService } from '@/services/socialService';
 import { getReadingProgress, ReadingProgress } from '@/services/quranProgress';
+import { socialService } from '@/services/socialService';
 import { useAppSelector } from '@/store/hooks';
 
 export default function HomeScreen() {
@@ -119,7 +119,7 @@ export default function HomeScreen() {
     <View style={[styles.headerContainer, { paddingTop: insets.top, backgroundColor: colors.background }]}>
       {/* Top Header: Profile, Search, Notifications */}
       <View style={styles.topHeader}>
-        <Pressable onPress={() => router.push('/profile')} style={styles.profileButton}>
+        <Pressable onPress={() => router.push('/settings')} style={styles.profileButton}>
           {userData.avatar_url ? (
             <Image source={{ uri: userData.avatar_url }} style={styles.profileAvatar} contentFit="cover" />
           ) : (

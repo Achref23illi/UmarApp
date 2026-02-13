@@ -101,28 +101,88 @@ export const loginUser = createAsyncThunk(
 
 export const registerUser = createAsyncThunk(
   'user/register',
-  async ({ email, password, fullName }: any, { rejectWithValue }) => {
+  async (
+    {
+      email,
+      password,
+      fullName,
+      age,
+      gender,
+      phoneNumber,
+    }: {
+      email: string;
+      password: string;
+      fullName: string;
+      age?: number | null;
+      gender?: 'male' | 'female' | null;
+      phoneNumber?: string | null;
+    },
+    { rejectWithValue }
+  ) => {
     try {
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: email.trim().toLowerCase(),
         password,
         options: {
           data: {
             full_name: fullName,
+            age: age ?? null,
+            gender: gender ?? null,
+            phone_number: phoneNumber ?? null,
           },
         },
       });
       if (error) throw error;
+
+      if (data.session && data.user) {
+        const { error: profileUpsertError } = await supabase.from('profiles').upsert(
+          {
+            id: data.user.id,
+            email: data.user.email,
+            full_name: fullName,
+            age: age ?? null,
+            gender: gender ?? null,
+            phone_number: phoneNumber ?? null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'id' }
+        );
+
+        if (profileUpsertError) {
+          console.warn('registerUser profile upsert warning:', profileUpsertError.message);
+        }
+      }
       
       // If email confirmation is enabled, session might be null
       if (!data.session) {
          // Return minimal data or handle "check email" state
-         return { session: null, user: data.user, profile: { full_name: fullName, avatar_url: null } }; 
+         return {
+           session: null,
+           user: data.user,
+           profile: {
+             full_name: fullName,
+             avatar_url: null,
+             cover_url: null,
+             age: age ?? null,
+             gender: gender ?? null,
+             phone_number: phoneNumber ?? null,
+           },
+         };
       }
 
-      return { session: data.session, profile: { full_name: fullName, avatar_url: null } };
+      return {
+        session: data.session,
+        profile: {
+          full_name: fullName,
+          avatar_url: null,
+          cover_url: null,
+          age: age ?? null,
+          gender: gender ?? null,
+          phone_number: phoneNumber ?? null,
+        },
+      };
     } catch (error: any) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error?.message || 'Registration failed');
     }
   }
 );

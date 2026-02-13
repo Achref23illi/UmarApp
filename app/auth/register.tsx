@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     ActivityIndicator,
@@ -29,6 +29,7 @@ import { Colors } from '@/config/colors';
 import { Fonts } from '@/hooks/use-fonts';
 import { useGoogleAuth } from '@/hooks/use-google-auth';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { registerUser } from '@/store/slices/userSlice';
 
 const PURPLE = Colors.palette.purple.primary;
 const PURPLE_DARK = Colors.palette.purple.dark;
@@ -41,14 +42,8 @@ export default function RegisterScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const insets = useSafeAreaInsets();
-  const { isLoading, error } = useAppSelector((state) => state.user);
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
   const { handleGoogleLogin } = useGoogleAuth();
-  
-  useEffect(() => {
-    if (!error) return;
-    Alert.alert(t('common.error'), error, [{ text: 'OK' }]);
-  }, [error, t]);
 
   const isRTL = currentLanguage === 'ar';
 
@@ -141,38 +136,45 @@ export default function RegisterScreen() {
 
     try {
       const age = calculateAge(birthday);
-      const fullPhone = selectedCountry.dialCode + phone.replace(/\D/g, '');
+      const fullPhone = `${selectedCountry.dialCode}${phone.replace(/\D/g, '')}`;
+      const normalizedEmail = email.trim().toLowerCase();
+      const normalizedName = name.trim();
 
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL;
-      const response = await fetch(`${apiUrl}/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          email, 
-          password, 
-          fullName: name,
+      const resultAction = await dispatch(
+        registerUser({
+          email: normalizedEmail,
+          password,
+          fullName: normalizedName,
           age,
           gender,
-          phone: fullPhone 
-        }),
-      });
+          phoneNumber: fullPhone,
+        })
+      );
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        Alert.alert(t('common.error'), data.error || 'Registration failed');
+      if (registerUser.rejected.match(resultAction)) {
+        const message =
+          typeof resultAction.payload === 'string'
+            ? resultAction.payload
+            : resultAction.error?.message || 'Registration failed';
+        Alert.alert(t('common.error'), message);
         return;
       }
 
-      // Success - redirect to OTP verification
-      router.push({ 
-        pathname: '/auth/verify-email', 
-        params: { email, fullName: name, age: age.toString(), gender, phone: fullPhone } 
-      });
+      const requiresEmailConfirmation = !resultAction.payload.session;
+      if (requiresEmailConfirmation) {
+        Alert.alert(
+          t('common.success') || 'Success',
+          'Account created. Please verify your email from your inbox, then log in.',
+          [{ text: 'OK', onPress: () => router.replace('/auth/login') }]
+        );
+        return;
+      }
+
+      router.replace('/(tabs)');
 
     } catch (e) {
       console.error('Registration Error:', e);
-      Alert.alert(t('common.error'), 'Unable to connect to server. Please try again.');
+      Alert.alert(t('common.error'), 'Registration failed. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

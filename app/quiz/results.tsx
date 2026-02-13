@@ -1,39 +1,189 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors } from '@/config/colors';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
+import { supabase } from '@/lib/supabase';
+import { QuizSessionSnapshot, quizSessionService } from '@/services/quizSessionService';
 import { useAppSelector } from '@/store/hooks';
+
+type ResultPlayer = {
+  id: string;
+  name: string;
+  score: number;
+  isCurrentUser: boolean;
+};
+
+type ResultSummary = {
+  mode: string;
+  totalQuestions: number;
+  players: ResultPlayer[];
+  winner: string;
+  themeLabel: string;
+};
 
 export default function QuizResultsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const { colors } = useTheme();
-  
-  const {
-    points = '0',
-    totalQuestions = '20',
-    theme = 'Histoire',
-  } = useLocalSearchParams<{
-    points?: string;
-    totalQuestions?: string;
-    theme?: string;
-  }>();
+
+  const { sessionId, summary } = useLocalSearchParams<{ sessionId?: string; summary?: string }>();
 
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
   const currentUser = useAppSelector((state) => state.user);
+
   const fontBold = getFont(currentLanguage, 'bold');
   const fontMedium = getFont(currentLanguage, 'medium');
   const fontRegular = getFont(currentLanguage, 'regular');
 
-  const score = parseInt(points);
+  const [isLoading, setIsLoading] = useState(true);
+  const [resultSummary, setResultSummary] = useState<ResultSummary | null>(null);
+
+  const tr = useCallback(
+    (key: string, fallback: string) => {
+      const translated = t(key);
+      return translated === key ? fallback : translated;
+    },
+    [t]
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const buildOnlineSummary = async (snapshot: QuizSessionSnapshot): Promise<ResultSummary> => {
+      let themeLabel = 'Quiz';
+
+      if (snapshot.session.category_id) {
+        const { data } = await supabase
+          .from('quiz_categories')
+          .select('name, name_fr')
+          .eq('id', snapshot.session.category_id)
+          .single();
+
+        if (data) {
+          themeLabel = currentLanguage === 'fr' && data.name_fr ? data.name_fr : data.name;
+        }
+      }
+
+      const players = [...snapshot.players]
+        .filter((player) => player.status !== 'left')
+        .sort((a, b) => b.score - a.score || a.seat_order - b.seat_order)
+        .map((player) => ({
+          id: player.id,
+          name: player.display_name,
+          score: player.score,
+          isCurrentUser: player.user_id === currentUser.id,
+        }));
+
+      return {
+        mode: snapshot.session.mode,
+        totalQuestions: snapshot.session.question_ids.length,
+        players,
+        winner: players[0]?.name || '',
+        themeLabel,
+      };
+    };
+
+    const load = async () => {
+      try {
+        setIsLoading(true);
+
+        if (summary) {
+          const parsed = JSON.parse(decodeURIComponent(summary)) as {
+            mode: string;
+            totalQuestions: number;
+            players: { id: string; displayName: string; score: number }[];
+            winner: string;
+          };
+
+          const players: ResultPlayer[] = parsed.players
+            .map((player) => ({
+              id: player.id,
+              name: player.displayName,
+              score: player.score,
+              isCurrentUser: false,
+            }))
+            .sort((a, b) => b.score - a.score);
+
+          if (!isMounted) return;
+          setResultSummary({
+            mode: parsed.mode,
+            totalQuestions: parsed.totalQuestions,
+            players,
+            winner: parsed.winner,
+            themeLabel: tr('quiz.v2.hotseat_title', 'Offline Hot-seat'),
+          });
+          return;
+        }
+
+        if (sessionId) {
+          const snapshot = await quizSessionService.getSessionSnapshot(sessionId);
+          const onlineSummary = await buildOnlineSummary(snapshot);
+          if (!isMounted) return;
+          setResultSummary(onlineSummary);
+          return;
+        }
+
+        if (!isMounted) return;
+        setResultSummary(null);
+      } catch (error) {
+        console.error('Failed to load results', error);
+        if (isMounted) {
+          setResultSummary(null);
+        }
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    void load();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [sessionId, summary, currentLanguage, currentUser.id, tr]);
+
+  const currentUserScore = useMemo(() => {
+    if (!resultSummary) return null;
+    return (
+      resultSummary.players.find((player) => player.isCurrentUser) ||
+      resultSummary.players[0] ||
+      null
+    );
+  }, [resultSummary]);
+
+  if (isLoading) {
+    return (
+      <View style={[styles.loaderContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={Colors.palette.purple.primary} />
+      </View>
+    );
+  }
+
+  if (!resultSummary) {
+    return (
+      <View style={[styles.loaderContainer, { backgroundColor: colors.background }]}>
+        <Text style={{ color: colors.text.secondary, marginBottom: 12 }}>
+          {tr('quiz.results.no_data', 'No result data available.')}
+        </Text>
+        <Pressable
+          style={[styles.simpleButton, { backgroundColor: Colors.palette.purple.primary }]}
+          onPress={() => router.replace('/(tabs)/quizz')}
+        >
+          <Text style={{ color: '#fff', fontWeight: '700' }}>
+            {tr('quiz.results.back_to_menu', 'Back to quiz menu')}
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -43,77 +193,110 @@ export default function QuizResultsScreen() {
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
       >
-        <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
-          {/* User Avatar */}
-          <View style={styles.avatarContainer}>
-            <View style={[styles.avatarCircle, { backgroundColor: colors.surface }]}>
-              <Ionicons name="person" size={60} color={colors.text.secondary} />
-            </View>
+        <ScrollView
+          contentContainerStyle={[
+            styles.content,
+            { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 30 },
+          ]}
+        >
+          <View style={styles.winnerRow}>
+            <Ionicons name="trophy" size={30} color={Colors.palette.gold.primary} />
+            <Text style={[styles.winnerTitle, { fontFamily: fontBold }]}>
+              {tr('quiz.results.congrats', 'Congratulations')}
+            </Text>
           </View>
 
-          {/* User Name */}
-          <Text style={[styles.userName, { fontFamily: fontMedium }]}>
-            {currentUser.name || 'User'}
+          <Text style={[styles.winnerName, { fontFamily: fontBold }]}>
+            {resultSummary.winner || '-'}
           </Text>
 
-          {/* Congratulations */}
-          <View style={styles.congratsContainer}>
-            <Ionicons name="trophy" size={32} color={Colors.palette.gold.primary} />
-            <Text style={[styles.congratsText, { fontFamily: fontBold }]}>
-              {t('quiz.results.congrats')}
+          <View style={styles.statsGrid}>
+            <View style={styles.statItem}>
+              <Text style={[styles.statLabel, { fontFamily: fontRegular }]}>
+                {tr('quiz.results.mode_label', 'Mode')}
+              </Text>
+              <Text style={[styles.statValue, { fontFamily: fontBold }]}>
+                {resultSummary.mode.toUpperCase()}
+              </Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={[styles.statLabel, { fontFamily: fontRegular }]}>
+                {tr('quiz.results.theme_label', 'Theme')}
+              </Text>
+              <Text style={[styles.statValue, { fontFamily: fontBold }]}>
+                {resultSummary.themeLabel}
+              </Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={[styles.statLabel, { fontFamily: fontRegular }]}>
+                {tr('quiz.results.questions_label', 'Questions')}
+              </Text>
+              <Text style={[styles.statValue, { fontFamily: fontBold }]}>
+                {resultSummary.totalQuestions}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.scoreCard}>
+            <Text style={[styles.scoreTitle, { fontFamily: fontMedium }]}>
+              {tr('quiz.results.leaderboard', 'Leaderboard')}
             </Text>
+
+            {resultSummary.players.map((player, index) => (
+              <View
+                key={player.id}
+                style={[styles.scoreRow, player.isCurrentUser && styles.scoreRowCurrent]}
+              >
+                <Text style={[styles.rankText, { fontFamily: fontBold }]}>{index + 1}</Text>
+                <Text
+                  style={[
+                    styles.playerText,
+                    { fontFamily: player.isCurrentUser ? fontBold : fontRegular },
+                  ]}
+                >
+                  {player.name}
+                </Text>
+                <Text style={[styles.playerScore, { fontFamily: fontBold }]}>{player.score}</Text>
+              </View>
+            ))}
           </View>
 
-          {/* Stats */}
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Ionicons name="grid" size={24} color="#FFFFFF" />
-              <Text style={[styles.statLabel, { fontFamily: fontRegular }]}>{t('quiz.results.score_label')}</Text>
-              <Text style={[styles.statValue, { fontFamily: fontBold }]}>{score}</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Ionicons name="bulb" size={24} color="#FFFFFF" />
-              <Text style={[styles.statLabel, { fontFamily: fontRegular }]}>2</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Ionicons name="happy" size={24} color="#FFFFFF" />
-              <Text style={[styles.statLabel, { fontFamily: fontRegular }]}>1</Text>
-            </View>
-          </View>
-
-          {/* Theme */}
-          <View style={styles.themeContainer}>
-            <Text style={[styles.themeLabel, { fontFamily: fontRegular }]}>{t('quiz.results.theme_label')}</Text>
-            <Text style={[styles.themeValue, { fontFamily: fontMedium }]}>{theme}</Text>
-          </View>
-
-          {/* View Ranking */}
-          <Pressable style={styles.rankingButton}>
-            <Text style={[styles.rankingText, { fontFamily: fontMedium }]}>
-              {t('quiz.results.ranking')}
+          {currentUserScore ? (
+            <Text style={[styles.currentScore, { fontFamily: fontMedium }]}>
+              {tr('quiz.results.score_label', 'Score')}: {currentUserScore.score}
             </Text>
-          </Pressable>
+          ) : null}
 
-          {/* Action Buttons */}
           <View style={styles.actionButtons}>
             <Pressable
-              style={[styles.actionButton, { backgroundColor: colors.surface }]}
-              onPress={() => router.push('/quiz/level-selection')}
+              style={[styles.actionButton, { backgroundColor: '#fff' }]}
+              onPress={() =>
+                router.replace({
+                  pathname: '/quiz/game-settings',
+                  params: { mode: resultSummary.mode },
+                })
+              }
             >
-              <Text style={[styles.actionButtonText, { fontFamily: fontMedium, color: Colors.palette.purple.primary }]}>
-                {t('quiz.results.new_game')}
+              <Text
+                style={[
+                  styles.actionButtonText,
+                  { fontFamily: fontBold, color: Colors.palette.purple.primary },
+                ]}
+              >
+                {tr('quiz.results.new_game', 'New game')}
               </Text>
             </Pressable>
+
             <Pressable
-              style={[styles.actionButton, { backgroundColor: 'transparent', borderColor: '#FFF', borderWidth: 1 }]}
-              onPress={() => router.push('/(tabs)/quizz')}
+              style={[styles.actionButton, styles.ghostButton]}
+              onPress={() => router.replace('/(tabs)/quizz')}
             >
-              <Text style={[styles.actionButtonText, { fontFamily: fontMedium, color: '#FFF' }]}>
-                {t('quiz.results.menu')}
+              <Text style={[styles.actionButtonText, { fontFamily: fontMedium, color: '#fff' }]}>
+                {tr('quiz.results.menu', 'Quiz menu')}
               </Text>
             </Pressable>
           </View>
-        </View>
+        </ScrollView>
       </LinearGradient>
     </View>
   );
@@ -127,102 +310,119 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  loaderContainer: {
     flex: 1,
     alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  avatarContainer: {
-    marginBottom: 16,
-  },
-  avatarCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
   },
-  userName: {
-    fontSize: 20,
-    color: '#FFFFFF',
-    marginBottom: 24,
+  simpleButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
   },
-  congratsContainer: {
+  winnerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 32,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
+    gap: 10,
+    marginBottom: 8,
   },
-  congratsText: {
-    fontSize: 24,
-    color: '#FFFFFF',
+  winnerTitle: {
+    fontSize: 28,
+    color: '#fff',
   },
-  statsContainer: {
+  winnerName: {
+    fontSize: 22,
+    color: '#fff',
+    marginBottom: 18,
+  },
+  statsGrid: {
+    width: '100%',
     flexDirection: 'row',
-    gap: 30,
-    marginBottom: 32,
+    justifyContent: 'space-between',
+    marginBottom: 18,
+    gap: 8,
   },
   statItem: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     alignItems: 'center',
-    gap: 8,
   },
   statLabel: {
+    color: 'rgba(255,255,255,0.85)',
     fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
+    marginBottom: 3,
   },
   statValue: {
-    fontSize: 24,
-    color: '#FFFFFF',
+    color: '#fff',
+    fontSize: 13,
+    textAlign: 'center',
   },
-  themeContainer: {
+  scoreCard: {
+    width: '100%',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 14,
+  },
+  scoreTitle: {
+    color: '#fff',
+    fontSize: 16,
+    marginBottom: 10,
+  },
+  scoreRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 24,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 6,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  themeLabel: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.9)',
+  scoreRowCurrent: {
+    backgroundColor: 'rgba(255,255,255,0.22)',
   },
-  themeValue: {
-    fontSize: 18,
-    color: '#FFFFFF',
+  rankText: {
+    width: 22,
+    color: '#fff',
+    fontSize: 14,
   },
-  rankingButton: {
-    marginBottom: 'auto',
+  playerText: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 14,
   },
-  rankingText: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    textDecorationLine: 'underline',
+  playerScore: {
+    color: '#fff',
+    fontSize: 15,
+  },
+  currentScore: {
+    color: '#fff',
+    fontSize: 15,
+    marginBottom: 14,
   },
   actionButtons: {
-    flexDirection: 'column',
-    gap: 12,
     width: '100%',
-    marginBottom: 40,
+    gap: 10,
   },
   actionButton: {
     width: '100%',
-    paddingVertical: 16,
-    borderRadius: 16,
+    borderRadius: 14,
+    paddingVertical: 14,
     alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+  },
+  ghostButton: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.8)',
+    backgroundColor: 'transparent',
   },
   actionButtonText: {
-    fontSize: 16,
+    fontSize: 15,
   },
 });

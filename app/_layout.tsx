@@ -12,6 +12,7 @@ import '@/locales/i18n';
 import { AuthLoader } from '@/components/AuthLoader';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import SplashScreen from '@/components/SplashScreen';
+import { ToastHost } from '@/components/ui/Toast';
 import { useAppFonts } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
 import { QueryProvider } from '@/providers/QueryProvider';
@@ -19,7 +20,6 @@ import { store } from '@/store';
 import { useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider } from 'react-redux';
-import { ToastHost } from '@/components/ui/Toast';
 
 // ... imports
 import i18n from '@/locales/i18n';
