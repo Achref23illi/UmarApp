@@ -6,6 +6,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router'; // Added import
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,6 +29,7 @@ const TABS: TabItem[] = [
   { name: 'challenges', icon: 'flame', iconOutline: 'flame-outline', label: 'Challenges' },
   { name: 'quizz', icon: 'school', iconOutline: 'school-outline', label: 'Quizz' },
   { name: 'salat', icon: 'time', iconOutline: 'time-outline', label: 'Salat' },
+  { name: 'profile', icon: 'person', iconOutline: 'person-outline', label: 'Profile' },
 ];
 
 interface CustomTabBarProps {
@@ -42,6 +44,7 @@ interface CustomTabBarProps {
 }
 
 export function CustomTabBar({ state, navigation }: CustomTabBarProps) {
+  const router = useRouter(); // Initialize router
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
 
@@ -52,6 +55,12 @@ export function CustomTabBar({ state, navigation }: CustomTabBarProps) {
   }
 
   const handleTabPress = (routeName: string) => {
+    // Redirect profile tab to settings
+    if (routeName === 'profile') {
+      router.push('/settings');
+      return;
+    }
+
     // Find route index in state
     const tabIndex = state.routes.findIndex(r => r.name === routeName);
     if (tabIndex === -1) {

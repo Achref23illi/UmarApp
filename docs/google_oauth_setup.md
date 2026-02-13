@@ -28,10 +28,11 @@ Follow these steps to configure Google OAuth for your UmarApp.
 5.  Paste the **Client ID** and **Client Secret** you copied from GCP.
 6.  Click **Save**.
 7.  Navigate to **Authentication** > **URL Configuration**.
-8.  Under **Redirect URLs**, add the following URLs to allow your app to receive the callback:
-    *   `umarapp://google-auth` (Your app's custom scheme)
-    *   `exp://localhost:8081` (For Expo Go local development, optional but recommended)
-    *   `http://localhost:3000` (If you have a web version)
+8.  **Important for physical device:** Set **Site URL** to `umarapp://` (or another non-localhost URL). If Site URL is `http://localhost:...`, after Google sign-in the browser will redirect to localhost and the device cannot open it (connection error / timeout).
+9.  Under **Redirect URLs**, add:
+    *   `umarapp://google-auth` (required for development build on device)
+    *   `umarapp://**` (optional wildcard for the scheme)
+    *   For Expo Go on device only: add your tunnel URL, e.g. `exp://xxx.ngrok.io/--/google-auth` (do not use `exp://localhost:8081` on a real device)
 
 ## 3. Implementation in Code
 

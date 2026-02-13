@@ -10,6 +10,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
+import { CompleteProfileModal } from '@/components/auth/CompleteProfileModal';
 import { CustomTabBar } from '@/components/navigation';
 
 export default function TabLayout() {
@@ -33,7 +34,9 @@ export default function TabLayout() {
         <Tabs.Screen name="challenges" options={{ title: 'Challenges' }} />
         <Tabs.Screen name="quizz" options={{ title: 'Quizz' }} />
         <Tabs.Screen name="salat" options={{ title: 'Salat' }} />
+        <Tabs.Screen name="profile" options={{ title: t('profile.title') }} />
       </Tabs>
+      <CompleteProfileModal />
     </View>
   );
 }
