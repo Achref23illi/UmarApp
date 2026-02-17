@@ -55,6 +55,13 @@ export interface MarkQuranSurahReadResult extends QuranDailyReadProgress {
   newlyCompletedDay: boolean;
 }
 
+export interface ChallengeQuranDayPlan {
+  day: number;
+  title: string;
+  surahs: number[];
+  note?: string;
+}
+
 export interface UserChallengeSettings {
   daysCount: number;
   exercisesCount: number;
@@ -106,6 +113,25 @@ type SurahReadRow = {
   surah_number: number;
 };
 
+type ChallengeArticleRow = {
+  id: string;
+  level_id: string | null;
+  title: string;
+  content: string;
+  sort_order: number | null;
+};
+
+type ChallengeQuranPlanPayload = {
+  type?: string;
+  level_id?: string;
+  days?: {
+    day?: number;
+    title?: string;
+    note?: string;
+    surahs?: number[];
+  }[];
+};
+
 const DEFAULT_SETTINGS: UserChallengeSettings = {
   daysCount: 9,
   exercisesCount: 2,
@@ -115,8 +141,9 @@ const DEFAULT_SETTINGS: UserChallengeSettings = {
   reminders: true,
   arabic: true,
 };
-const SUPPORTED_CATEGORY_SLUGS = new Set(['quran', 'salat_obligatoire', 'sadaqa']);
 const LOCAL_SURAH_READS_KEY = '@challenge_quran_daily_surah_reads_v1';
+const QURAN_PLAN_ARTICLE_TITLE = '__quran_plan_v1__';
+const QURAN_PLAN_CONTENT_TYPE = 'quran_plan_v1';
 let isSurahReadsTableAvailable: boolean | null = null;
 
 function formatISODate(d: Date): string {
@@ -275,6 +302,45 @@ function normalizeSurahNumbers(values: number[]): number[] {
   );
 }
 
+function toNullableText(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : undefined;
+}
+
+function parseQuranPlanFromArticleContent(content: string): ChallengeQuranDayPlan[] {
+  try {
+    const parsed = JSON.parse(content) as ChallengeQuranPlanPayload;
+    if (!parsed || typeof parsed !== 'object') return [];
+
+    const isQuranPlanPayload =
+      parsed.type === QURAN_PLAN_CONTENT_TYPE && Array.isArray(parsed.days);
+    if (!isQuranPlanPayload) return [];
+
+    const dayMap = new Map<number, ChallengeQuranDayPlan>();
+    parsed.days?.forEach((item) => {
+      const day = Number.parseInt(String(item?.day ?? ''), 10);
+      if (!Number.isInteger(day) || day < 1) return;
+
+      const surahValues = Array.isArray(item?.surahs) ? item.surahs : [];
+      const surahs = normalizeSurahNumbers(
+        surahValues.map((value) => Number.parseInt(String(value), 10))
+      );
+
+      dayMap.set(day, {
+        day,
+        title: toNullableText(item?.title) ?? `Jour ${day}`,
+        note: toNullableText(item?.note),
+        surahs,
+      });
+    });
+
+    return [...dayMap.values()].sort((a, b) => a.day - b.day);
+  } catch {
+    return [];
+  }
+}
+
 function buildSurahReadsLocalKey(userId: string, levelId: string, dateISO: string): string {
   return `${userId}:${levelId}:${dateISO}`;
 }
@@ -338,7 +404,9 @@ async function readSurahReadsFromStorage(params: {
 
     if (!error) {
       isSurahReadsTableAvailable = true;
-      return normalizeSurahNumbers(((data as SurahReadRow[] | null) ?? []).map((r) => r.surah_number));
+      return normalizeSurahNumbers(
+        ((data as SurahReadRow[] | null) ?? []).map((r) => r.surah_number)
+      );
     }
 
     if (!isMissingSurahReadsTableError(error)) throw error;
@@ -369,12 +437,14 @@ async function markSurahReadInStorage(params: {
       let newlyMarkedSurah = false;
 
       if (!existing?.id) {
-        const { error: insertError } = await supabase.from('user_challenge_daily_surah_reads').insert({
-          user_id: params.userId,
-          level_id: params.levelId,
-          completed_date: params.dateISO,
-          surah_number: params.surahNumber,
-        });
+        const { error: insertError } = await supabase
+          .from('user_challenge_daily_surah_reads')
+          .insert({
+            user_id: params.userId,
+            level_id: params.levelId,
+            completed_date: params.dateISO,
+            surah_number: params.surahNumber,
+          });
         if (insertError) {
           if (!isMissingSurahReadsTableError(insertError)) throw insertError;
           isSurahReadsTableAvailable = false;
@@ -483,7 +553,7 @@ export const challengeDetailsService = {
     const { data: catRows, error: catErr } = await supabase
       .from('challenge_categories')
       .select(
-        'id, slug, title, subtitle, description, duration, levels, prerequisite, icon_name, image_url, is_locked, color, sort_order'
+        'id, slug, title, subtitle, description, duration, levels, prerequisite, icon_name, image_url, is_locked, is_enabled, color, sort_order'
       )
       .in('id', categoryIds);
 
@@ -501,6 +571,7 @@ export const challengeDetailsService = {
       icon_name: string;
       image_url: string | null;
       is_locked: boolean;
+      is_enabled: boolean | null;
       color: string;
       sort_order: number;
     };
@@ -517,6 +588,7 @@ export const challengeDetailsService = {
         iconName: r.icon_name,
         imageUrl: r.image_url,
         isLocked: !!r.is_locked,
+        isEnabled: r.is_enabled !== false,
         color: r.color,
         sortOrder: r.sort_order,
       };
@@ -524,7 +596,7 @@ export const challengeDetailsService = {
 
     const categoryMap = new Map(
       (catRows as CatRow[])
-        .filter((row) => SUPPORTED_CATEGORY_SLUGS.has(row.slug))
+        .filter((row) => row.is_enabled !== false)
         .map((row) => [row.id, mapCategoryRowFromRaw(row)])
     );
 
@@ -665,6 +737,35 @@ export const challengeDetailsService = {
     };
   },
 
+  getQuranPlanForLevel: async (levelId: string): Promise<ChallengeQuranDayPlan[]> => {
+    if (!levelId) return [];
+
+    const { data, error } = await supabase
+      .from('challenge_articles')
+      .select('id, level_id, title, content, sort_order')
+      .eq('level_id', levelId)
+      .order('sort_order', { ascending: true });
+
+    if (error) throw error;
+
+    const rows = (data as ChallengeArticleRow[] | null) ?? [];
+    for (const row of rows) {
+      if (
+        row.title !== QURAN_PLAN_ARTICLE_TITLE &&
+        !String(row.content || '').includes(`"${QURAN_PLAN_CONTENT_TYPE}"`)
+      ) {
+        continue;
+      }
+
+      const parsed = parseQuranPlanFromArticleContent(row.content || '');
+      if (parsed.length > 0) {
+        return parsed;
+      }
+    }
+
+    return [];
+  },
+
   getTodayQuranReadProgress: async ({
     levelId,
     requiredSurahs,
@@ -738,12 +839,14 @@ export const challengeDetailsService = {
     let newlyCompletedDay = false;
 
     if (completedToday && !existingCompletion?.id) {
-      const { error: insertError } = await supabase.from('user_challenge_daily_completions').insert({
-        user_id: userId,
-        level_id: levelId,
-        completed_date: todayISO,
-        value: 2,
-      });
+      const { error: insertError } = await supabase
+        .from('user_challenge_daily_completions')
+        .insert({
+          user_id: userId,
+          level_id: levelId,
+          completed_date: todayISO,
+          value: 2,
+        });
       if (insertError) throw insertError;
       newlyCompletedDay = true;
 
@@ -840,7 +943,8 @@ export const challengeDetailsService = {
           activeBefore?.id === levelId && activeAfter && activeAfter.id !== levelId
             ? activeAfter.title
             : undefined,
-        challengeCompleted: !activeAfter && statesAfter.every((item) => item.status === 'completed'),
+        challengeCompleted:
+          !activeAfter && statesAfter.every((item) => item.status === 'completed'),
       };
     }
 

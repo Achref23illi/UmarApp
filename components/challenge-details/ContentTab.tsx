@@ -25,7 +25,12 @@ import {
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
-import { ChallengeLevelDashboard, ChallengeLevel, challengeDetailsService } from '@/services/challengeDetailsService';
+import {
+  ChallengeLevelDashboard,
+  ChallengeLevel,
+  ChallengeQuranDayPlan,
+  challengeDetailsService,
+} from '@/services/challengeDetailsService';
 import { challengeService } from '@/services/challengeService';
 import { SURAHS } from '@/services/quranData';
 import { getFrenchSurah } from '@/services/quranFrench';
@@ -49,6 +54,21 @@ type ContentTabProps = {
   levelId?: string;
   embedded?: boolean;
 };
+
+const QURAN_PLAN_CONTENT_TYPE = 'quran_plan_v1';
+const QURAN_PLAN_ARTICLE_TITLE = '__quran_plan_v1__';
+
+function isSystemQuranPlanArticle(article: Article): boolean {
+  if (article.title === QURAN_PLAN_ARTICLE_TITLE) return true;
+  const content = String(article.content || '');
+  if (!content.includes(`"${QURAN_PLAN_CONTENT_TYPE}"`)) return false;
+  try {
+    const parsed = JSON.parse(content) as { type?: string; days?: unknown[] };
+    return parsed?.type === QURAN_PLAN_CONTENT_TYPE && Array.isArray(parsed.days);
+  } catch {
+    return false;
+  }
+}
 
 export default function ContentTab({ challengeSlug, levelId, embedded = false }: ContentTabProps) {
   const router = useRouter();
@@ -82,6 +102,7 @@ export default function ContentTab({ challengeSlug, levelId, embedded = false }:
 
   const [checked, setChecked] = useState<Record<string, boolean>>({});
 
+  const [quranPlans, setQuranPlans] = useState<ChallengeQuranDayPlan[]>([]);
   const [quranPreviewBySurah, setQuranPreviewBySurah] = useState<Record<number, string>>({});
   const [isLoadingQuranPreview, setIsLoadingQuranPreview] = useState(false);
   const [readSurahsToday, setReadSurahsToday] = useState<number[]>([]);
@@ -146,10 +167,11 @@ export default function ContentTab({ challengeSlug, levelId, embedded = false }:
 
   const quranPlanToday = useMemo(() => {
     if (resolvedSlug !== 'quran') return null;
-    const plans = QURAN_PLANS[levelNumber] ?? [];
-    const d = clampDay(dayNumber, plans.length || 1);
-    return getPlanForDay(plans, d) ?? null;
-  }, [resolvedSlug, levelNumber, dayNumber]);
+    const fallbackPlans = QURAN_PLANS[levelNumber] ?? [];
+    const maxDays = totalDays || Math.max(quranPlans.length, fallbackPlans.length) || 1;
+    const d = clampDay(dayNumber, maxDays);
+    return getPlanForDay(quranPlans, d) ?? getPlanForDay(fallbackPlans, d) ?? null;
+  }, [resolvedSlug, levelNumber, dayNumber, quranPlans, totalDays]);
 
   const quranRequiredSurahsToday = useMemo(
     () =>
@@ -177,6 +199,32 @@ export default function ContentTab({ challengeSlug, levelId, embedded = false }:
     const d = clampDay(dayNumber, plans.length || 1);
     return getPlanForDay(plans, d) ?? null;
   }, [resolvedSlug, levelNumber, dayNumber]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadQuranPlans = async () => {
+      if (resolvedSlug !== 'quran' || !resolvedLevelId) {
+        setQuranPlans([]);
+        return;
+      }
+
+      try {
+        const plans = await challengeDetailsService.getQuranPlanForLevel(resolvedLevelId);
+        if (!isActive) return;
+        setQuranPlans(plans);
+      } catch (error) {
+        console.error('Failed to load Quran plan for level:', error);
+        if (!isActive) return;
+        setQuranPlans([]);
+      }
+    };
+
+    loadQuranPlans();
+    return () => {
+      isActive = false;
+    };
+  }, [resolvedSlug, resolvedLevelId]);
 
   useEffect(() => {
     let isActive = true;
@@ -309,7 +357,8 @@ export default function ContentTab({ challengeSlug, levelId, embedded = false }:
         if (error) throw error;
 
         if (!isActive) return;
-        setArticles((data as Article[]) ?? []);
+        const articleItems = ((data as Article[]) ?? []).filter((item) => !isSystemQuranPlanArticle(item));
+        setArticles(articleItems);
       } catch (e) {
         console.error('Failed to load challenge articles:', e);
         if (!isActive) return;

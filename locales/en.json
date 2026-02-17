@@ -478,6 +478,8 @@
     "addSpecificInstructions": "Add any specific instructions (Optional)...",
     "addMessageForCommunity": "Add a message for the community...",
     "postCreated": "Post created successfully",
+    "requestSubmittedTitle": "Request submitted",
+    "requestSubmittedMessage": "Your request was sent to admin and will be published after review.",
     "postFailed": "Failed to create post",
     "merit": "Merit",
     "meritTitle": "The merit of attending funeral ceremonies",
@@ -540,7 +542,13 @@
     "addMosquePhoto": "Add Mosque Photo",
     "required": "Name, Location, and Image are required.",
     "success": "Mosque added successfully!",
-    "failed": "Failed to add mosque"
+    "failed": "Failed to add mosque",
+    "challenges": "Challenges",
+    "manageContent": "Manage content",
+    "quizzes": "Quizzes",
+    "manageQuizzes": "Manage quizzes",
+    "duas": "Duas",
+    "manageDuas": "Manage duas"
   },
   "comments": {
     "pageTitle": "Comments",

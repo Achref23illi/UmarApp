@@ -229,9 +229,6 @@ function normalizeCategorySlug(input: string): string {
   if (raw.includes('prophe')) return 'prophets';
   if (raw.includes('compan') || raw.includes('sahaba')) return 'sahaba';
   if (raw.includes('fiqh')) return 'fiqh';
-  if (raw.includes('sunna') || raw.includes('sunnah') || raw.includes('seerah')) return 'seerah';
-  if (raw.includes('ramadan')) return 'fiqh';
-  if (raw.includes('pillar') || raw.includes('pili')) return 'fiqh';
   return raw;
 }
 

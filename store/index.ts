@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import appReducer from './slices/appSlice';
 import counterReducer from './slices/counterSlice';
 import languageReducer from './slices/languageSlice';
+import notificationsReducer from './slices/notificationsSlice';
 import userReducer from './slices/userSlice';
 import agendaReducer from './slices/agendaSlice';
 
@@ -12,6 +13,7 @@ export const store = configureStore({
     app: appReducer,
     language: languageReducer,
     agenda: agendaReducer,
+    notifications: notificationsReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

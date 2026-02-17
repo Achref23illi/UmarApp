@@ -6,6 +6,7 @@ export interface GameQuizQuestion {
   options: string[];
   correctAnswer: string;
   explanation?: string | null;
+  imageUrl?: string | null;
 }
 
 type QuizCategoryRow = {
@@ -30,6 +31,7 @@ type QuizQuestionRow = {
   options_fr?: unknown;
   correct_answer_fr?: string | null;
   explanation?: string | null;
+  image_url?: string | null;
   is_active?: boolean | null;
 };
 
@@ -67,15 +69,6 @@ export function inferThemeKey(theme: string): string {
   )
     return 'sahaba';
   if (normalized.includes('fiqh') || normalized.includes('juris')) return 'fiqh';
-  if (
-    normalized.includes('sunna') ||
-    normalized.includes('sunnah') ||
-    normalized.includes('seerah')
-  )
-    return 'seerah';
-  if (normalized.includes('pili') || normalized.includes('pillar')) return 'fiqh';
-  if (normalized.includes('foi') || normalized.includes('faith')) return 'fiqh';
-  if (normalized.includes('ramadan')) return 'fiqh';
 
   return normalized;
 }
@@ -89,8 +82,6 @@ export function normalizeThemeToCategorySlug(theme: string): string | null {
     return 'prophets';
   if (key === 'companions' || key === 'sahaba' || key === 'musulmans') return 'sahaba';
   if (key === 'fiqh') return 'fiqh';
-  if (key === 'sunnah' || key === 'sunna' || key === 'seerah') return 'seerah';
-  if (key === 'pillars' || key === 'piliers' || key === 'faith') return 'fiqh';
 
   return key || null;
 }
@@ -118,6 +109,7 @@ function mapQuestionRow(row: QuizQuestionRow, language: string): GameQuizQuestio
     options: asStringArray(optionsRaw),
     correctAnswer,
     explanation: row.explanation ?? null,
+    imageUrl: row.image_url ?? null,
   };
 }
 

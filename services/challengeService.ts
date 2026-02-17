@@ -2,7 +2,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
-const SUPPORTED_CHALLENGE_SLUGS = new Set(['quran', 'salat_obligatoire', 'sadaqa']);
 const API_TIMEOUT_MS = Number(process.env.EXPO_PUBLIC_API_TIMEOUT || '30000');
 const BACKEND_FETCH_TIMEOUT_MS = Math.max(600, Math.min(API_TIMEOUT_MS, 1200));
 const SUPABASE_FETCH_TIMEOUT_MS = 5000;
@@ -20,6 +19,7 @@ export interface ChallengeCategory {
   iconName: string;
   imageUrl?: string | null;
   isLocked: boolean;
+  isEnabled: boolean;
   color: string;
   sortOrder: number;
 }
@@ -36,6 +36,7 @@ type ChallengeCategoryRow = {
   icon_name: string;
   image_url: string | null;
   is_locked: boolean;
+  is_enabled: boolean | null;
   color: string;
   sort_order: number;
 };
@@ -53,6 +54,7 @@ function mapCategoryRow(row: ChallengeCategoryRow): ChallengeCategory {
     iconName: row.icon_name,
     imageUrl: row.image_url,
     isLocked: !!row.is_locked,
+    isEnabled: row.is_enabled !== false,
     color: row.color,
     sortOrder: row.sort_order,
   };
@@ -71,6 +73,7 @@ const LOCAL_FALLBACK_CATEGORIES: ChallengeCategory[] = [
     iconName: 'book-outline',
     imageUrl: null,
     isLocked: false,
+    isEnabled: true,
     color: '#670FA4',
     sortOrder: 1,
   },
@@ -86,6 +89,7 @@ const LOCAL_FALLBACK_CATEGORIES: ChallengeCategory[] = [
     iconName: 'time-outline',
     imageUrl: null,
     isLocked: false,
+    isEnabled: true,
     color: '#F5C661',
     sortOrder: 2,
   },
@@ -101,6 +105,7 @@ const LOCAL_FALLBACK_CATEGORIES: ChallengeCategory[] = [
     iconName: 'heart-outline',
     imageUrl: null,
     isLocked: false,
+    isEnabled: true,
     color: '#4CAF50',
     sortOrder: 3,
   },
@@ -167,7 +172,10 @@ async function readCachedCategories(): Promise<ChallengeCategory[] | null> {
     if (!Array.isArray(parsed) || parsed.length === 0) return null;
     const sanitized = parsed.filter(
       (item): item is ChallengeCategory =>
-        !!item && typeof item === 'object' && typeof item.id === 'string' && !isFallbackCategory(item)
+        !!item &&
+        typeof item === 'object' &&
+        typeof item.id === 'string' &&
+        !isFallbackCategory(item)
     );
     if (!sanitized.length) {
       await AsyncStorage.removeItem(CHALLENGE_CATEGORIES_CACHE_KEY);
@@ -193,12 +201,6 @@ export const challengeService = {
   getFallbackCategories: (): ChallengeCategory[] => getFreshFallbackCategories(),
 
   getCategories: async (): Promise<ChallengeCategory[]> => {
-    const normalize = (rows: ChallengeCategoryRow[]) =>
-      rows
-        .filter((row) => SUPPORTED_CHALLENGE_SLUGS.has(row.slug))
-        .map((row) => mapCategoryRow(row))
-        .sort((a, b) => a.sortOrder - b.sortOrder);
-
     const cached = await readCachedCategories();
     if (cached?.length) {
       // Return cached data immediately and refresh silently in background.
@@ -235,8 +237,8 @@ export const challengeService = {
   refreshCategories: async (): Promise<ChallengeCategory[]> => {
     const normalize = (rows: ChallengeCategoryRow[]) =>
       rows
-        .filter((row) => SUPPORTED_CHALLENGE_SLUGS.has(row.slug))
         .map((row) => mapCategoryRow(row))
+        .filter((row) => row.isEnabled)
         .sort((a, b) => a.sortOrder - b.sortOrder);
 
     const backendTask = fetchCategoriesFromBackendWithTimeout();
@@ -274,13 +276,12 @@ export const challengeService = {
       .single();
 
     if (error) return null;
-    if (!SUPPORTED_CHALLENGE_SLUGS.has((data as ChallengeCategoryRow).slug)) return null;
-    return mapCategoryRow(data as ChallengeCategoryRow);
+    const mapped = mapCategoryRow(data as ChallengeCategoryRow);
+    if (!mapped.isEnabled) return null;
+    return mapped;
   },
 
   getCategoryBySlug: async (slug: string): Promise<ChallengeCategory | null> => {
-    if (!SUPPORTED_CHALLENGE_SLUGS.has(slug)) return null;
-
     const cached = await readCachedCategories();
     if (cached?.length) {
       const fromCache = cached.find((item) => item.slug === slug && !isFallbackCategory(item));
@@ -296,6 +297,7 @@ export const challengeService = {
     if (error) return null;
 
     const mapped = mapCategoryRow(data as ChallengeCategoryRow);
+    if (!mapped.isEnabled) return null;
     if (memoryCategoriesCache?.length) {
       const idx = memoryCategoriesCache.findIndex((item) => item.slug === mapped.slug);
       if (idx >= 0) {

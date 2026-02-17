@@ -558,6 +558,8 @@
     "addSpecificInstructions": "Ajouter des instructions spécifiques (Optionnel)...",
     "addMessageForCommunity": "Ajouter un message pour la communauté...",
     "postCreated": "Publication créée avec succès",
+    "requestSubmittedTitle": "Demande envoyée",
+    "requestSubmittedMessage": "Votre demande a été envoyée à l'admin et sera publiée après validation.",
     "postFailed": "Échec de la création de la publication",
     "merit": "Mérite",
     "meritTitle": "Le mérite d'assister aux cérémonies funéraires",
@@ -620,7 +622,13 @@
     "addMosquePhoto": "Ajouter une photo",
     "required": "Nom, emplacement et image requis.",
     "success": "Mosquée ajoutée avec succès !",
-    "failed": "Échec de l'ajout"
+    "failed": "Échec de l'ajout",
+    "challenges": "Défis",
+    "manageContent": "Gérer le contenu",
+    "quizzes": "Quiz",
+    "manageQuizzes": "Gérer les quiz",
+    "duas": "Douas",
+    "manageDuas": "Gérer les douas"
   },
   "comments": {
     "pageTitle": "Commentaires",

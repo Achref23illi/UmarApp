@@ -3,11 +3,29 @@ import { Share } from 'react-native';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
+function getAdminApiBaseUrl(): string | null {
+  if (!API_URL) return null;
+  const base = API_URL.replace(/\/$/, '');
+  return base.endsWith('/api') ? `${base}/admin` : `${base}/api/admin`;
+}
+
 async function getAuthHeader(): Promise<Record<string, string>> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  return session ? { Authorization: `Bearer ${session.access_token}` } : {};
+
+  if (session?.access_token) {
+    const { error } = await supabase.auth.getUser(session.access_token);
+    if (!error) return { Authorization: `Bearer ${session.access_token}` };
+  }
+
+  // Try refreshing
+  const { data } = await supabase.auth.refreshSession();
+  if (data.session?.access_token) {
+    return { Authorization: `Bearer ${data.session.access_token}` };
+  }
+
+  return {};
 }
 
 export interface User {
@@ -194,18 +212,63 @@ export const socialService = {
 
       const { data: session } = await supabase.auth.getSession();
       const currentUserId = session.session?.user?.id;
+      let currentUserIsAdmin = false;
 
-      let query = supabase
-        .from('posts')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .range(from, to);
-
-      if (userId) {
-        query = query.eq('user_id', userId);
+      if (currentUserId) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', currentUserId)
+          .maybeSingle();
+        currentUserIsAdmin = !!profile?.is_admin;
       }
 
-      const { data, error } = await query;
+      // Fire-and-forget: trigger archiving of expired posts
+      const adminBase = getAdminApiBaseUrl();
+      if (adminBase) {
+        getAuthHeader().then(h => {
+          if (h.Authorization) {
+            fetch(`${adminBase}/posts/archive-expired`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...h },
+            }).catch(() => {});
+          }
+        }).catch(() => {});
+      }
+
+      const executeQuery = async (legacyMode = false) => {
+        let query = supabase
+          .from('posts')
+          .select('*')
+          .eq('is_archived', false)
+          .order('created_at', { ascending: false })
+          .range(from, to);
+
+        if (userId) {
+          query = query.eq('user_id', userId);
+        }
+
+        if (!currentUserIsAdmin) {
+          if (!legacyMode) {
+            query = query.not('moderation_status', 'eq', 'rejected');
+          }
+
+          if (currentUserId) {
+            query = query.or(`is_approved.eq.true,user_id.eq.${currentUserId}`);
+          } else {
+            query = query.eq('is_approved', true);
+          }
+        }
+
+        return query;
+      };
+
+      let result = await executeQuery(false);
+      if (result.error && String(result.error.message || '').includes('moderation_status')) {
+        result = await executeQuery(true);
+      }
+
+      const { data, error } = result;
       if (error) throw error;
 
       const postIds = (data || []).map((p: any) => p.id);
@@ -301,6 +364,7 @@ export const socialService = {
       const { data: postData, error: postError } = await supabase
         .from('posts')
         .select('*')
+        .eq('is_archived', false)
         .in('id', postIds);
       if (postError) throw postError;
 
@@ -471,18 +535,57 @@ export const socialService = {
     try {
       const { data: session } = await supabase.auth.getSession();
       if (!session.session) throw new Error('Not authenticated');
+      const userId = session.session.user.id;
 
-      const { error } = await supabase.from('posts').insert({
-        user_id: session.session.user.id,
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', userId)
+        .maybeSingle();
+
+      const isAdmin = !!profile?.is_admin;
+      const isRequestType = type === 'janaza' || type === 'sick_visit';
+
+      if (!isAdmin && !isRequestType) {
+        throw new Error('Only admins can publish this post type');
+      }
+
+      const basePayload = {
+        user_id: userId,
         content,
         type,
         metadata,
         image_url: imageUrl,
         lat: location?.lat,
         lng: location?.lng,
-      });
+      };
 
-      if (error) throw error;
+      const moderationPayload = {
+        ...basePayload,
+        is_approved: isAdmin,
+        moderation_status: isAdmin ? 'approved' : 'pending',
+      };
+
+      let insertResult = await supabase.from('posts').insert(moderationPayload);
+
+      if (
+        insertResult.error &&
+        String(insertResult.error.message || '').toLowerCase().includes('moderation_status')
+      ) {
+        insertResult = await supabase.from('posts').insert({
+          ...basePayload,
+          is_approved: isAdmin,
+        });
+      }
+
+      if (
+        insertResult.error &&
+        String(insertResult.error.message || '').toLowerCase().includes('is_approved')
+      ) {
+        insertResult = await supabase.from('posts').insert(basePayload);
+      }
+
+      if (insertResult.error) throw insertResult.error;
       return true;
     } catch (error) {
       console.error('createPost error:', error);
@@ -496,12 +599,10 @@ export const socialService = {
       const arrayBuffer = await response.arrayBuffer();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
 
-      const { data, error } = await supabase.storage
-        .from('post-images')
-        .upload(fileName, arrayBuffer, {
-          contentType: 'image/jpeg',
-          upsert: false,
-        });
+      const { error } = await supabase.storage.from('post-images').upload(fileName, arrayBuffer, {
+        contentType: 'image/jpeg',
+        upsert: false,
+      });
 
       if (error) {
         console.error('Storage upload error:', error);
@@ -521,16 +622,56 @@ export const socialService = {
 
   getComments: async (postId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('comments')
-        .select(
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const currentUserId = session?.user?.id;
+
+      let currentUserIsAdmin = false;
+      if (currentUserId) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', currentUserId)
+          .maybeSingle();
+        currentUserIsAdmin = !!profile?.is_admin;
+      }
+
+      const executeQuery = async (legacyMode = false) => {
+        let query = supabase
+          .from('comments')
+          .select(
+            `
+              *,
+              user:profiles(id, full_name, avatar_url)
           `
-            *,
-            user:profiles(id, full_name, avatar_url)
-        `
-        )
-        .eq('post_id', postId)
-        .order('created_at', { ascending: true });
+          )
+          .eq('post_id', postId)
+          .order('created_at', { ascending: true });
+
+        if (!currentUserIsAdmin) {
+          if (currentUserId) {
+            if (!legacyMode) {
+              query = query.or(`moderation_status.eq.approved,user_id.eq.${currentUserId}`);
+            } else {
+              query = query.or(`is_approved.eq.true,user_id.eq.${currentUserId}`);
+            }
+          } else if (!legacyMode) {
+            query = query.eq('moderation_status', 'approved');
+          } else {
+            query = query.eq('is_approved', true);
+          }
+        }
+
+        return query;
+      };
+
+      let result = await executeQuery(false);
+      if (result.error && String(result.error.message || '').includes('moderation_status')) {
+        result = await executeQuery(true);
+      }
+
+      const { data, error } = result;
 
       if (error) throw error;
 
@@ -553,21 +694,51 @@ export const socialService = {
 
   approveComment: async (commentId: string) => {
     try {
+      const adminBaseUrl = getAdminApiBaseUrl();
+      if (adminBaseUrl) {
+        const authHeaders = await getAuthHeader();
+        if (authHeaders.Authorization) {
+          const response = await fetch(`${adminBaseUrl}/comments/${commentId}/approve`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              ...authHeaders,
+            },
+          });
+          if (response.ok) return true;
+        }
+      }
+
       const { error } = await supabase
         .from('comments')
         .update({ is_approved: true })
         .eq('id', commentId);
       return !error;
-    } catch (e) {
+    } catch {
       return false;
     }
   },
 
   deleteComment: async (commentId: string) => {
     try {
+      const adminBaseUrl = getAdminApiBaseUrl();
+      if (adminBaseUrl) {
+        const authHeaders = await getAuthHeader();
+        if (authHeaders.Authorization) {
+          const response = await fetch(`${adminBaseUrl}/comments/${commentId}`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              ...authHeaders,
+            },
+          });
+          if (response.ok) return true;
+        }
+      }
+
       const { error } = await supabase.from('comments').delete().eq('id', commentId);
       return !error;
-    } catch (e) {
+    } catch {
       return false;
     }
   },

@@ -2,6 +2,26 @@
 
 An Islamic app built with [Expo](https://expo.dev) using a development build.
 
+## Backend Shared Setup
+
+The backend is now shared at:
+
+- `/Users/achrafarabi/Dev/project/Umarapp-platform/backend`
+
+Mobile app and dashboard both use this same backend.
+
+Run backend from `Umarapp-platform`:
+
+```bash
+npm run dev:backend
+```
+
+or from this folder:
+
+```bash
+npm run backend:dev
+```
+
 > ⚠️ **Important:** This app requires a **development build** and does **NOT** work with Expo Go. It is currently built for **iOS only**.
 
 ## Prerequisites

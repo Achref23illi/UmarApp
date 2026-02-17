@@ -1,784 +1,1004 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Stack, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
+import { AdminFilters } from '@/components/admin/AdminFilters';
+import { AdminList } from '@/components/admin/AdminList';
+import { AdminScreen } from '@/components/admin/AdminScreen';
 import { useTheme } from '@/hooks/use-theme';
+import { adminService } from '@/services/adminService';
+import { AdminQuiz, AdminQuizAnalytics, AdminQuizCategory, AdminQuizQuestion } from '@/types/admin';
+import { Ionicons } from '@expo/vector-icons';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  AdminQuiz,
-  AdminQuizCategory,
-  AdminQuizQuestion,
-  quizAdminService,
-} from '@/services/quizAdminService';
+    Alert,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    View,
+} from 'react-native';
 
-const EMPTY_OPTIONS = ['', '', '', ''];
+type QuizTab = 'categories' | 'quizzes' | 'questions' | 'analytics';
+
+const EMPTY_CATEGORY_FORM = {
+  name: '',
+  name_fr: '',
+  slug: '',
+  icon: 'school',
+  description: '',
+  description_fr: '',
+  color: '#8B5CF6',
+  min_question_count: '10',
+  is_enabled: true,
+};
+
+const EMPTY_QUIZ_FORM = {
+  title: '',
+  title_fr: '',
+  difficulty: 'medium',
+  is_enabled: true,
+};
+
+const EMPTY_QUESTION_FORM = {
+  question: '',
+  question_fr: '',
+  options: ['', '', '', ''],
+  correctIndex: '0',
+  is_active: true,
+};
 
 export default function AdminQuizzesScreen() {
   const { colors } = useTheme();
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
+
+  const [tab, setTab] = useState<QuizTab>('categories');
+  const [search, setSearch] = useState('');
 
   const [categories, setCategories] = useState<AdminQuizCategory[]>([]);
   const [quizzes, setQuizzes] = useState<AdminQuiz[]>([]);
   const [questions, setQuestions] = useState<AdminQuizQuestion[]>([]);
 
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-  const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  const [selectedQuizId, setSelectedQuizId] = useState<string>('');
 
-  const [loadingCategories, setLoadingCategories] = useState(true);
-  const [loadingQuestions, setLoadingQuestions] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [analytics, setAnalytics] = useState<AdminQuizAnalytics | null>(null);
 
-  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
-  const [questionText, setQuestionText] = useState('');
-  const [questionTextFr, setQuestionTextFr] = useState('');
-  const [answers, setAnswers] = useState<string[]>([...EMPTY_OPTIONS]);
-  const [answersFr, setAnswersFr] = useState<string[]>([...EMPTY_OPTIONS]);
-  const [correctAnswerIndex, setCorrectAnswerIndex] = useState(0);
-  const [correctAnswerFr, setCorrectAnswerFr] = useState('');
-  const [isActive, setIsActive] = useState(true);
+  const [categoryModal, setCategoryModal] = useState(false);
+  const [quizModal, setQuizModal] = useState(false);
+  const [questionModal, setQuestionModal] = useState(false);
 
-  const selectedQuiz = useMemo(
-    () => quizzes.find((quiz) => quiz.id === selectedQuizId) || null,
-    [quizzes, selectedQuizId]
-  );
+  const [editingCategory, setEditingCategory] = useState<AdminQuizCategory | null>(null);
+  const [editingQuiz, setEditingQuiz] = useState<AdminQuiz | null>(null);
+  const [editingQuestion, setEditingQuestion] = useState<AdminQuizQuestion | null>(null);
 
-  const resetForm = () => {
-    setEditingQuestionId(null);
-    setQuestionText('');
-    setQuestionTextFr('');
-    setAnswers([...EMPTY_OPTIONS]);
-    setAnswersFr([...EMPTY_OPTIONS]);
-    setCorrectAnswerIndex(0);
-    setCorrectAnswerFr('');
-    setIsActive(true);
-  };
+  const [categoryForm, setCategoryForm] = useState(EMPTY_CATEGORY_FORM);
+  const [quizForm, setQuizForm] = useState(EMPTY_QUIZ_FORM);
+  const [questionForm, setQuestionForm] = useState(EMPTY_QUESTION_FORM);
 
-  const loadCategories = async () => {
-    try {
-      setLoadingCategories(true);
-      const data = await quizAdminService.getCategories();
-      setCategories(data);
+  const selectedCategory = categories.find((item) => item.id === selectedCategoryId) || null;
+  const selectedQuiz = quizzes.find((item) => item.id === selectedQuizId) || null;
 
-      if (data.length > 0) {
-        const nextCategoryId =
-          selectedCategoryId && data.some((item) => item.id === selectedCategoryId)
-            ? selectedCategoryId
-            : data[0].id;
-        setSelectedCategoryId(nextCategoryId);
-      } else {
-        setSelectedCategoryId(null);
-      }
-    } catch (error) {
-      console.error('Failed to load quiz categories', error);
-      Alert.alert('Error', 'Failed to load quiz categories.');
-    } finally {
-      setLoadingCategories(false);
+  const loadCategories = useCallback(async () => {
+    const response = await adminService.quiz.listCategories({
+      q: search || undefined,
+      page: 1,
+      limit: 200,
+    });
+    const rows = response.items || [];
+    setCategories(rows);
+
+    if (rows.length > 0 && !rows.some((row) => row.id === selectedCategoryId)) {
+      setSelectedCategoryId(rows[0].id);
     }
-  };
 
-  const loadQuizzes = async (categoryId: string) => {
-    try {
-      const data = await quizAdminService.getQuizzes(categoryId);
-      setQuizzes(data);
-
-      if (data.length > 0) {
-        const nextQuizId =
-          selectedQuizId && data.some((item) => item.id === selectedQuizId)
-            ? selectedQuizId
-            : data[0].id;
-        setSelectedQuizId(nextQuizId);
-      } else {
-        setSelectedQuizId(null);
-        setQuestions([]);
-      }
-    } catch (error) {
-      console.error('Failed to load quizzes', error);
-      Alert.alert('Error', 'Failed to load quizzes for selected category.');
+    if (!rows.length) {
+      setSelectedCategoryId('');
+      setSelectedQuizId('');
       setQuizzes([]);
-      setSelectedQuizId(null);
       setQuestions([]);
     }
-  };
+  }, [search, selectedCategoryId]);
 
-  const loadQuestions = async (quizId: string) => {
-    try {
-      setLoadingQuestions(true);
-      const data = await quizAdminService.getQuestions(quizId);
-      setQuestions(data);
-    } catch (error) {
-      console.error('Failed to load quiz questions', error);
-      Alert.alert('Error', 'Failed to load questions.');
-      setQuestions([]);
-    } finally {
-      setLoadingQuestions(false);
+  const loadQuizzes = useCallback(async () => {
+    if (!selectedCategoryId) {
+      setQuizzes([]);
+      setSelectedQuizId('');
+      return;
     }
-  };
 
-  useEffect(() => {
-    void loadCategories();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const response = await adminService.quiz.listQuizzes({
+      categoryId: selectedCategoryId,
+      page: 1,
+      limit: 200,
+    });
+    const rows = response.items || [];
+    setQuizzes(rows);
 
-  useEffect(() => {
-    if (!selectedCategoryId) return;
-    void loadQuizzes(selectedCategoryId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategoryId]);
+    if (rows.length > 0 && !rows.some((row) => row.id === selectedQuizId)) {
+      setSelectedQuizId(rows[0].id);
+    }
 
-  useEffect(() => {
-    if (!selectedQuizId) return;
-    void loadQuestions(selectedQuizId);
+    if (!rows.length) {
+      setSelectedQuizId('');
+      setQuestions([]);
+    }
+  }, [selectedCategoryId, selectedQuizId]);
+
+  const loadQuestions = useCallback(async () => {
+    if (!selectedQuizId) {
+      setQuestions([]);
+      return;
+    }
+
+    const response = await adminService.quiz.listQuestions({
+      quizId: selectedQuizId,
+      page: 1,
+      limit: 500,
+    });
+    setQuestions(response.items || []);
   }, [selectedQuizId]);
 
-  const updateAnswer = (index: number, text: string) => {
-    setAnswers((prev) => {
-      const next = [...prev];
-      next[index] = text;
-      return next;
+  const loadAnalytics = useCallback(async () => {
+    try {
+      const res = await adminService.quiz.getAnalytics();
+      setAnalytics(res);
+    } catch {
+      // Analytics can fail gracefully
+    }
+  }, []);
+
+  const loadAll = useCallback(async () => {
+    try {
+      setLoading(true);
+      await loadCategories();
+    } catch (error: any) {
+      console.error('Failed to load quiz admin', error);
+      Alert.alert('Load Error', error?.message || 'Failed to load quiz data');
+    } finally {
+      setLoading(false);
+    }
+  }, [loadCategories]);
+
+  useEffect(() => {
+    void loadAll();
+  }, [loadAll]);
+
+  useEffect(() => {
+    void loadQuizzes();
+  }, [loadQuizzes]);
+
+  useEffect(() => {
+    void loadQuestions();
+  }, [loadQuestions]);
+
+  useEffect(() => {
+    if (tab === 'analytics') {
+      void loadAnalytics();
+    }
+  }, [tab, loadAnalytics]);
+
+  const openCreateCategory = () => {
+    setEditingCategory(null);
+    setCategoryForm(EMPTY_CATEGORY_FORM);
+    setCategoryModal(true);
+  };
+
+  const openEditCategory = (item: AdminQuizCategory) => {
+    setEditingCategory(item);
+    setCategoryForm({
+      name: item.name,
+      name_fr: item.name_fr || '',
+      slug: item.slug || '',
+      icon: item.icon || 'school',
+      description: item.description || '',
+      description_fr: item.description_fr || '',
+      color: item.color || '#8B5CF6',
+      min_question_count: String(item.min_question_count || 10),
+      is_enabled: item.is_enabled !== false,
     });
+    setCategoryModal(true);
   };
 
-  const updateAnswerFr = (index: number, text: string) => {
-    setAnswersFr((prev) => {
-      const next = [...prev];
-      next[index] = text;
-      return next;
-    });
-  };
-
-  const handleOpenCreate = () => {
-    resetForm();
-    setModalVisible(true);
-  };
-
-  const handleOpenEdit = (question: AdminQuizQuestion) => {
-    setEditingQuestionId(question.id);
-    setQuestionText(question.question);
-    setQuestionTextFr(question.question_fr || '');
-
-    const normalizedOptions = [...question.options, ...EMPTY_OPTIONS].slice(0, 4);
-    setAnswers(normalizedOptions);
-
-    const normalizedOptionsFr = [...(question.options_fr || []), ...EMPTY_OPTIONS].slice(0, 4);
-    setAnswersFr(normalizedOptionsFr);
-
-    const matchIndex = normalizedOptions.findIndex((option) => option === question.correct_answer);
-    setCorrectAnswerIndex(matchIndex >= 0 ? matchIndex : 0);
-    setCorrectAnswerFr(question.correct_answer_fr || '');
-    setIsActive(question.is_active);
-    setModalVisible(true);
-  };
-
-  const validateForm = (): string | null => {
-    if (!selectedQuizId) return 'Please select a quiz first.';
-    if (!questionText.trim()) return 'Please enter question text.';
-    if (answers.some((answer) => !answer.trim())) return 'Please fill all 4 answer options.';
-
-    const correct = answers[correctAnswerIndex]?.trim();
-    if (!correct) return 'Please select the correct answer.';
-
-    return null;
-  };
-
-  const handleSaveQuestion = async () => {
-    const validationError = validateForm();
-    if (validationError) {
-      Alert.alert('Validation', validationError);
+  const saveCategory = async () => {
+    if (!categoryForm.name.trim() || !categoryForm.slug.trim()) {
+      Alert.alert('Validation', 'Name and slug are required');
       return;
     }
 
     const payload = {
-      question: questionText,
-      questionFr: questionTextFr,
-      options: answers,
-      optionsFr: answersFr.some((answer) => answer.trim().length > 0) ? answersFr : undefined,
-      correctAnswer: answers[correctAnswerIndex],
-      correctAnswerFr: correctAnswerFr,
-      isActive,
+      name: categoryForm.name.trim(),
+      name_fr: categoryForm.name_fr.trim() || null,
+      slug: categoryForm.slug.trim().toLowerCase(),
+      icon: categoryForm.icon.trim() || 'school',
+      description: categoryForm.description.trim() || null,
+      description_fr: categoryForm.description_fr.trim() || null,
+      color: categoryForm.color.trim() || '#8B5CF6',
+      min_question_count: Number.parseInt(categoryForm.min_question_count, 10) || 10,
+      is_enabled: categoryForm.is_enabled,
     };
 
     try {
-      setIsSubmitting(true);
-
-      if (editingQuestionId) {
-        await quizAdminService.updateQuestion(editingQuestionId, payload);
+      if (editingCategory) {
+        await adminService.quiz.updateCategory(editingCategory.id, payload);
       } else {
-        await quizAdminService.createQuestion({
-          quizId: selectedQuizId!,
-          ...payload,
-        });
+        await adminService.quiz.createCategory(payload);
       }
-
-      setModalVisible(false);
-      resetForm();
-
-      if (selectedQuizId) {
-        await loadQuestions(selectedQuizId);
-      }
+      setCategoryModal(false);
+      await loadCategories();
     } catch (error: any) {
-      console.error('Failed to save question', error);
-      Alert.alert('Error', error?.message || 'Failed to save question.');
-    } finally {
-      setIsSubmitting(false);
+      Alert.alert('Error', error?.message || 'Failed to save category');
     }
   };
 
-  const handleDelete = (questionId: string) => {
-    Alert.alert('Delete Question', 'Are you sure you want to delete this question?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await quizAdminService.deleteQuestion(questionId);
-            setQuestions((prev) => prev.filter((question) => question.id !== questionId));
-          } catch (error) {
-            console.error('Failed to delete question', error);
-            Alert.alert('Error', 'Failed to delete question.');
-          }
-        },
-      },
-    ]);
+  const removeCategory = async (id: string) => {
+    try {
+      const res = await adminService.quiz.deleteCategory(id);
+      if (res.softDisabled) {
+        Alert.alert(
+          'Soft disabled',
+          'Category has historical attempts, so it was disabled instead of deleted.'
+        );
+      }
+      await loadCategories();
+    } catch {
+      Alert.alert('Error', 'Failed to delete category');
+    }
   };
 
-  const renderQuestionItem = ({ item }: { item: AdminQuizQuestion }) => (
-    <View style={[styles.card, { backgroundColor: colors.surface }]}>
-      <View style={styles.cardHeaderRow}>
-        <View style={{ flex: 1, marginRight: 12 }}>
-          <Text style={[styles.questionText, { color: colors.text.primary }]}>{item.question}</Text>
-          {item.question_fr ? (
-            <Text style={[styles.questionFrText, { color: colors.text.secondary }]}>
-              {item.question_fr}
-            </Text>
-          ) : null}
-        </View>
+  const openCreateQuiz = () => {
+    if (!selectedCategoryId) {
+      Alert.alert('Info', 'Create or select a category first');
+      return;
+    }
+    setEditingQuiz(null);
+    setQuizForm(EMPTY_QUIZ_FORM);
+    setQuizModal(true);
+  };
 
-        <View style={styles.cardActions}>
-          <View
-            style={[
-              styles.statusPill,
-              {
-                backgroundColor: item.is_active
-                  ? 'rgba(16, 185, 129, 0.2)'
-                  : 'rgba(239, 68, 68, 0.2)',
-              },
-            ]}
-          >
-            <Text
-              style={{
-                color: item.is_active ? '#059669' : '#DC2626',
-                fontSize: 12,
-                fontWeight: '600',
-              }}
-            >
-              {item.is_active ? 'Active' : 'Inactive'}
-            </Text>
-          </View>
-          <Pressable onPress={() => handleOpenEdit(item)} hitSlop={8}>
-            <Ionicons name="create-outline" size={20} color={colors.primary} />
-          </Pressable>
-          <Pressable onPress={() => handleDelete(item.id)} hitSlop={8}>
-            <Ionicons name="trash-outline" size={20} color={colors.error || '#EF4444'} />
-          </Pressable>
-        </View>
-      </View>
+  const openEditQuiz = (item: AdminQuiz) => {
+    setEditingQuiz(item);
+    setQuizForm({
+      title: item.title,
+      title_fr: item.title_fr || '',
+      difficulty: item.difficulty || 'medium',
+      is_enabled: item.is_enabled !== false,
+    });
+    setQuizModal(true);
+  };
 
-      <View style={styles.answersList}>
-        {item.options.map((answer, index) => (
-          <Text
-            key={`${item.id}-option-${index}`}
-            style={[
-              styles.answerText,
-              { color: answer === item.correct_answer ? '#059669' : colors.text.secondary },
-            ]}
-          >
-            {index + 1}. {answer} {answer === item.correct_answer ? '(Correct)' : ''}
-          </Text>
-        ))}
-      </View>
-    </View>
-  );
+  const saveQuiz = async () => {
+    if (!selectedCategoryId || !quizForm.title.trim()) {
+      Alert.alert('Validation', 'Category and title are required');
+      return;
+    }
+
+    const payload = {
+      category_id: selectedCategoryId,
+      title: quizForm.title.trim(),
+      title_fr: quizForm.title_fr.trim() || null,
+      difficulty: quizForm.difficulty,
+      is_enabled: quizForm.is_enabled,
+    };
+
+    try {
+      if (editingQuiz) {
+        await adminService.quiz.updateQuiz(editingQuiz.id, payload);
+      } else {
+        await adminService.quiz.createQuiz(payload);
+      }
+      setQuizModal(false);
+      await loadQuizzes();
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to save quiz');
+    }
+  };
+
+  const removeQuiz = async (id: string) => {
+    try {
+      const res = await adminService.quiz.deleteQuiz(id);
+      if (res.softDisabled) {
+        Alert.alert(
+          'Soft disabled',
+          'Quiz has historical sessions, so it was disabled instead of deleted.'
+        );
+      }
+      await loadQuizzes();
+    } catch {
+      Alert.alert('Error', 'Failed to delete quiz');
+    }
+  };
+
+  const openCreateQuestion = () => {
+    if (!selectedQuizId) {
+      Alert.alert('Info', 'Select a quiz first');
+      return;
+    }
+    setEditingQuestion(null);
+    setQuestionForm(EMPTY_QUESTION_FORM);
+    setQuestionModal(true);
+  };
+
+  const openEditQuestion = (item: AdminQuizQuestion) => {
+    const normalizedOptions = [...(item.options || []), '', '', '', ''].slice(0, 4);
+    const matchIndex = Math.max(
+      0,
+      normalizedOptions.findIndex((opt) => opt === item.correct_answer)
+    );
+
+    setEditingQuestion(item);
+    setQuestionForm({
+      question: item.question,
+      question_fr: item.question_fr || '',
+      options: normalizedOptions,
+      correctIndex: String(matchIndex),
+      is_active: item.is_active !== false,
+    });
+    setQuestionModal(true);
+  };
+
+  const saveQuestion = async () => {
+    if (!selectedQuizId || !questionForm.question.trim()) {
+      Alert.alert('Validation', 'Quiz and question are required');
+      return;
+    }
+
+    const options = questionForm.options.map((opt) => opt.trim()).filter(Boolean);
+    const correctIndex = Number.parseInt(questionForm.correctIndex, 10);
+
+    if (options.length < 2 || !options[correctIndex]) {
+      Alert.alert('Validation', 'Provide at least 2 options and valid correct answer index');
+      return;
+    }
+
+    const payload = {
+      quiz_id: selectedQuizId,
+      question: questionForm.question.trim(),
+      question_fr: questionForm.question_fr.trim() || null,
+      options,
+      correct_answer: options[correctIndex],
+      is_active: questionForm.is_active,
+    };
+
+    try {
+      if (editingQuestion) {
+        await adminService.quiz.updateQuestion(editingQuestion.id, payload);
+      } else {
+        await adminService.quiz.createQuestion(payload);
+      }
+      setQuestionModal(false);
+      await loadQuestions();
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to save question');
+    }
+  };
+
+  const removeQuestion = async (id: string) => {
+    try {
+      const res = await adminService.quiz.deleteQuestion(id);
+      if (res.softDisabled) {
+        Alert.alert(
+          'Soft disabled',
+          'Question has historical answers, so it was disabled instead of deleted.'
+        );
+      }
+      await loadQuestions();
+    } catch {
+      Alert.alert('Error', 'Failed to delete question');
+    }
+  };
+
+  const tabOptions = [
+    { key: 'categories', label: 'Categories' },
+    { key: 'quizzes', label: 'Quizzes' },
+    { key: 'questions', label: 'Questions' },
+    { key: 'analytics', label: 'Analytics' },
+  ];
 
   return (
-    <View
-      style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}
+    <AdminScreen
+      title="Quiz Control"
+      scroll={false}
+      right={
+        <Pressable
+          onPress={() => {
+            if (tab === 'categories') openCreateCategory();
+            if (tab === 'quizzes') openCreateQuiz();
+            if (tab === 'questions') openCreateQuestion();
+            if (tab === 'analytics') void loadAnalytics();
+          }}
+          hitSlop={8}
+        >
+          <Ionicons
+            name={tab === 'analytics' ? 'refresh' : 'add-circle'}
+            size={24}
+            color={colors.primary}
+          />
+        </Pressable>
+      }
     >
-      <Stack.Screen options={{ headerShown: false }} />
+      <View style={{ flex: 1, gap: 12 }}>
+        <AdminFilters
+          options={tabOptions}
+          activeKey={tab}
+          onChangeOption={(key) => setTab(key as QuizTab)}
+        />
 
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
-        </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>Manage Quizzes</Text>
-        <Pressable onPress={() => void loadCategories()} style={styles.refreshButton}>
-          <Ionicons name="refresh-outline" size={20} color={colors.primary} />
-        </Pressable>
-      </View>
+        {tab !== 'analytics' ? <AdminFilters search={search} onChangeSearch={setSearch} /> : null}
 
-      {loadingCategories ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      ) : (
-        <>
-          <View style={styles.selectorSection}>
+        <View style={styles.selectorRow}>
+          <View style={[styles.selector, { borderColor: '#DEE5EF' }]}>
             <Text style={[styles.selectorLabel, { color: colors.text.secondary }]}>Category</Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.selectorChips}
+              contentContainerStyle={{ gap: 6 }}
             >
-              {categories.map((category) => {
-                const selected = category.id === selectedCategoryId;
-                return (
-                  <Pressable
-                    key={category.id}
-                    onPress={() => setSelectedCategoryId(category.id)}
-                    style={[
-                      styles.chip,
-                      {
-                        backgroundColor: selected ? colors.primary : colors.surface,
-                        borderColor: selected ? colors.primary : colors.border,
-                      },
-                    ]}
+              {categories.map((item) => (
+                <Pressable
+                  key={item.id}
+                  onPress={() => setSelectedCategoryId(item.id)}
+                  style={[
+                    styles.selectorChip,
+                    {
+                      backgroundColor: selectedCategoryId === item.id ? colors.primary : '#EEF2F7',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      color: selectedCategoryId === item.id ? '#FFFFFF' : '#0F172A',
+                      fontSize: 12,
+                      fontWeight: '700',
+                    }}
                   >
-                    <Text
-                      style={{ color: selected ? '#fff' : colors.text.primary, fontWeight: '600' }}
-                    >
-                      {category.name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-
-            <Text style={[styles.selectorLabel, { color: colors.text.secondary }]}>Quiz</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.selectorChips}
-            >
-              {quizzes.map((quiz) => {
-                const selected = quiz.id === selectedQuizId;
-                return (
-                  <Pressable
-                    key={quiz.id}
-                    onPress={() => setSelectedQuizId(quiz.id)}
-                    style={[
-                      styles.chip,
-                      {
-                        backgroundColor: selected ? colors.primary : colors.surface,
-                        borderColor: selected ? colors.primary : colors.border,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={{ color: selected ? '#fff' : colors.text.primary, fontWeight: '600' }}
-                    >
-                      {quiz.title}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+                    {item.name}
+                  </Text>
+                </Pressable>
+              ))}
             </ScrollView>
           </View>
 
-          {loadingQuestions ? (
-            <View style={styles.center}>
-              <ActivityIndicator size="large" color={colors.primary} />
+          {(tab === 'questions' || tab === 'quizzes') && (
+            <View style={[styles.selector, { borderColor: '#DEE5EF' }]}>
+              <Text style={[styles.selectorLabel, { color: colors.text.secondary }]}>Quiz</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 6 }}
+              >
+                {quizzes.map((item) => (
+                  <Pressable
+                    key={item.id}
+                    onPress={() => setSelectedQuizId(item.id)}
+                    style={[
+                      styles.selectorChip,
+                      { backgroundColor: selectedQuizId === item.id ? colors.primary : '#EEF2F7' },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        color: selectedQuizId === item.id ? '#FFFFFF' : '#0F172A',
+                        fontSize: 12,
+                        fontWeight: '700',
+                      }}
+                    >
+                      {item.title}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
             </View>
-          ) : (
-            <FlatList
-              data={questions}
-              renderItem={renderQuestionItem}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.listContent}
-              ListEmptyComponent={
-                <View style={{ paddingVertical: 40 }}>
-                  <Text style={{ textAlign: 'center', color: colors.text.secondary }}>
-                    {selectedQuiz
-                      ? 'No questions found for this quiz.'
-                      : 'Select a quiz to manage questions.'}
-                  </Text>
-                </View>
-              }
-            />
           )}
-        </>
-      )}
+        </View>
 
-      <Pressable
-        style={[
-          styles.fab,
-          {
-            backgroundColor: selectedQuizId ? colors.primary : colors.text.disabled,
-            opacity: selectedQuizId ? 1 : 0.6,
-          },
-        ]}
-        onPress={handleOpenCreate}
-        disabled={!selectedQuizId}
-      >
-        <Ionicons name="add" size={28} color="#fff" />
-      </Pressable>
+        {tab === 'categories' ? (
+          <AdminList
+            data={categories}
+            loading={loading}
+            keyExtractor={(item) => item.id}
+            emptyText="No categories"
+            renderItem={({ item }) => (
+              <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: '#E5EAF2' }]}>
+                <View style={styles.cardHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.cardTitle, { color: colors.text.primary }]}>
+                      {item.name}
+                    </Text>
+                    <Text style={[styles.cardMeta, { color: colors.text.secondary }]}>
+                      {item.slug}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={item.is_enabled !== false}
+                    onValueChange={async (value) => {
+                      await adminService.quiz.updateCategory(item.id, { is_enabled: value });
+                      await loadCategories();
+                    }}
+                    trackColor={{ false: '#CBD5E1', true: colors.primary }}
+                  />
+                </View>
+                <View style={styles.actions}>
+                  <Pressable
+                    onPress={() => openEditCategory(item)}
+                    style={[styles.btn, { backgroundColor: colors.primary }]}
+                  >
+                    <Text style={styles.btnText}>Edit</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => removeCategory(item.id)}
+                    style={[styles.btn, { backgroundColor: '#EF4444' }]}
+                  >
+                    <Text style={styles.btnText}>Delete</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+          />
+        ) : null}
+
+        {tab === 'quizzes' ? (
+          <AdminList
+            data={quizzes}
+            loading={loading}
+            keyExtractor={(item) => item.id}
+            emptyText={selectedCategory ? 'No quizzes' : 'Select a category'}
+            renderItem={({ item }) => (
+              <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: '#E5EAF2' }]}>
+                <View style={styles.cardHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.cardTitle, { color: colors.text.primary }]}>
+                      {item.title}
+                    </Text>
+                    <Text style={[styles.cardMeta, { color: colors.text.secondary }]}>
+                      Difficulty: {item.difficulty || 'medium'}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={item.is_enabled !== false}
+                    onValueChange={async (value) => {
+                      await adminService.quiz.updateQuiz(item.id, { is_enabled: value });
+                      await loadQuizzes();
+                    }}
+                    trackColor={{ false: '#CBD5E1', true: colors.primary }}
+                  />
+                </View>
+                <View style={styles.actions}>
+                  <Pressable
+                    onPress={() => openEditQuiz(item)}
+                    style={[styles.btn, { backgroundColor: colors.primary }]}
+                  >
+                    <Text style={styles.btnText}>Edit</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => removeQuiz(item.id)}
+                    style={[styles.btn, { backgroundColor: '#EF4444' }]}
+                  >
+                    <Text style={styles.btnText}>Delete</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+          />
+        ) : null}
+
+        {tab === 'questions' ? (
+          <AdminList
+            data={questions}
+            loading={loading}
+            keyExtractor={(item) => item.id}
+            emptyText={selectedQuiz ? 'No questions' : 'Select a quiz'}
+            renderItem={({ item }) => (
+              <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: '#E5EAF2' }]}>
+                <View style={styles.cardHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.cardTitle, { color: colors.text.primary }]}>
+                      {item.question}
+                    </Text>
+                    <Text style={[styles.cardMeta, { color: colors.text.secondary }]}>
+                      Correct: {item.correct_answer}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={item.is_active !== false}
+                    onValueChange={async (value) => {
+                      await adminService.quiz.updateQuestion(item.id, { is_active: value });
+                      await loadQuestions();
+                    }}
+                    trackColor={{ false: '#CBD5E1', true: colors.primary }}
+                  />
+                </View>
+                <View style={styles.actions}>
+                  <Pressable
+                    onPress={() => openEditQuestion(item)}
+                    style={[styles.btn, { backgroundColor: colors.primary }]}
+                  >
+                    <Text style={styles.btnText}>Edit</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => removeQuestion(item.id)}
+                    style={[styles.btn, { backgroundColor: '#EF4444' }]}
+                  >
+                    <Text style={styles.btnText}>Delete</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+          />
+        ) : null}
+
+        {tab === 'analytics' ? (
+          <ScrollView contentContainerStyle={{ gap: 10, paddingBottom: 20 }}>
+            <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: '#E5EAF2' }]}>
+              <Text style={[styles.cardTitle, { color: colors.text.primary }]}>Quiz Metrics</Text>
+              <Text style={[styles.cardMeta, { color: colors.text.secondary }]}>
+                Attempts: {analytics?.metrics.totalAttempts ?? 0}
+              </Text>
+              <Text style={[styles.cardMeta, { color: colors.text.secondary }]}>
+                Average score: {analytics?.metrics.avgScore ?? 0}
+              </Text>
+              <Text style={[styles.cardMeta, { color: colors.text.secondary }]}>
+                Questions: {analytics?.metrics.totalQuestions ?? 0}
+              </Text>
+              <Text style={[styles.cardMeta, { color: colors.text.secondary }]}>
+                Active questions: {analytics?.metrics.activeQuestions ?? 0}
+              </Text>
+            </View>
+
+            <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: '#E5EAF2' }]}>
+              <Text style={[styles.cardTitle, { color: colors.text.primary }]}>Mode breakdown</Text>
+              {Object.entries(analytics?.modeBreakdown || {}).map(([mode, count]) => (
+                <Text key={mode} style={[styles.cardMeta, { color: colors.text.secondary }]}>
+                  {mode}: {count}
+                </Text>
+              ))}
+            </View>
+
+            <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: '#E5EAF2' }]}>
+              <Text style={[styles.cardTitle, { color: colors.text.primary }]}>Top categories</Text>
+              {(analytics?.categoryBreakdown || []).map((item) => (
+                <Text
+                  key={`${item.category_id}-${item.attempts}`}
+                  style={[styles.cardMeta, { color: colors.text.secondary }]}
+                >
+                  {item.category_name}: {item.attempts}
+                </Text>
+              ))}
+            </View>
+          </ScrollView>
+        ) : null}
+      </View>
 
       <Modal
-        visible={modalVisible}
+        visible={categoryModal}
+        transparent
         animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={() => setCategoryModal(false)}
       >
-        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-          <View style={styles.modalHeader}>
+        <View style={styles.modalOverlay}>
+          <ScrollView style={styles.modalCard} contentContainerStyle={{ gap: 10 }}>
             <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
-              {editingQuestionId ? 'Edit Question' : 'Add Question'}
-            </Text>
-            <Pressable onPress={() => setModalVisible(false)}>
-              <Text style={{ color: colors.primary, fontSize: 16 }}>Close</Text>
-            </Pressable>
-          </View>
-
-          <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-            <Text style={[styles.label, { color: colors.text.secondary }]}>Quiz</Text>
-            <Text style={[styles.quizTitleValue, { color: colors.text.primary }]}>
-              {selectedQuiz?.title || '-'}
-            </Text>
-
-            <Text style={[styles.label, { color: colors.text.secondary }]}>Question (EN)</Text>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: colors.surface,
-                  color: colors.text.primary,
-                  borderColor: colors.border,
-                },
-              ]}
-              placeholder="Enter question"
-              placeholderTextColor={colors.text.secondary}
-              value={questionText}
-              onChangeText={setQuestionText}
-              multiline
-            />
-
-            <Text style={[styles.label, { color: colors.text.secondary }]}>
-              Question (FR) - optional
+              {editingCategory ? 'Edit category' : 'Create category'}
             </Text>
             <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: colors.surface,
-                  color: colors.text.primary,
-                  borderColor: colors.border,
-                },
-              ]}
-              placeholder="Entrez la question"
+              placeholder="Name"
+              value={categoryForm.name}
+              onChangeText={(v) => setCategoryForm((p) => ({ ...p, name: v }))}
+              style={[styles.input, { color: colors.text.primary }]}
               placeholderTextColor={colors.text.secondary}
-              value={questionTextFr}
-              onChangeText={setQuestionTextFr}
-              multiline
             />
-
-            <Text style={[styles.label, { color: colors.text.secondary }]}>
-              Options (minimum 4)
-            </Text>
-            {answers.map((answer, index) => (
-              <View key={`option-${index}`} style={styles.optionRow}>
-                <Pressable
-                  style={[
-                    styles.radio,
-                    {
-                      borderColor:
-                        correctAnswerIndex === index ? colors.primary : colors.text.secondary,
-                    },
-                  ]}
-                  onPress={() => setCorrectAnswerIndex(index)}
-                >
-                  {correctAnswerIndex === index ? (
-                    <View style={[styles.radioInner, { backgroundColor: colors.primary }]} />
-                  ) : null}
-                </Pressable>
-
-                <TextInput
-                  style={[
-                    styles.input,
-                    styles.optionInput,
-                    {
-                      backgroundColor: colors.surface,
-                      color: colors.text.primary,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  placeholder={`Option ${index + 1}`}
-                  placeholderTextColor={colors.text.secondary}
-                  value={answer}
-                  onChangeText={(text) => updateAnswer(index, text)}
-                />
-              </View>
-            ))}
-
-            <Text style={[styles.label, { color: colors.text.secondary }]}>
-              Options (FR) - optional
-            </Text>
-            {answersFr.map((answer, index) => (
-              <TextInput
-                key={`option-fr-${index}`}
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.surface,
-                    color: colors.text.primary,
-                    borderColor: colors.border,
-                  },
-                ]}
-                placeholder={`Option FR ${index + 1}`}
-                placeholderTextColor={colors.text.secondary}
-                value={answer}
-                onChangeText={(text) => updateAnswerFr(index, text)}
-              />
-            ))}
-
-            <Text style={[styles.label, { color: colors.text.secondary }]}>
-              Correct answer (FR) - optional
-            </Text>
             <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: colors.surface,
-                  color: colors.text.primary,
-                  borderColor: colors.border,
-                },
-              ]}
-              placeholder="Bonne reponse"
+              placeholder="Name (FR)"
+              value={categoryForm.name_fr}
+              onChangeText={(v) => setCategoryForm((p) => ({ ...p, name_fr: v }))}
+              style={[styles.input, { color: colors.text.primary }]}
               placeholderTextColor={colors.text.secondary}
-              value={correctAnswerFr}
-              onChangeText={setCorrectAnswerFr}
             />
-
+            <TextInput
+              placeholder="Slug"
+              value={categoryForm.slug}
+              onChangeText={(v) => setCategoryForm((p) => ({ ...p, slug: v }))}
+              autoCapitalize="none"
+              style={[styles.input, { color: colors.text.primary }]}
+              placeholderTextColor={colors.text.secondary}
+            />
+            <TextInput
+              placeholder="Icon"
+              value={categoryForm.icon}
+              onChangeText={(v) => setCategoryForm((p) => ({ ...p, icon: v }))}
+              style={[styles.input, { color: colors.text.primary }]}
+              placeholderTextColor={colors.text.secondary}
+            />
+            <TextInput
+              placeholder="Description"
+              value={categoryForm.description}
+              onChangeText={(v) => setCategoryForm((p) => ({ ...p, description: v }))}
+              style={[styles.input, { color: colors.text.primary }]}
+              placeholderTextColor={colors.text.secondary}
+            />
+            <TextInput
+              placeholder="Description (FR)"
+              value={categoryForm.description_fr}
+              onChangeText={(v) => setCategoryForm((p) => ({ ...p, description_fr: v }))}
+              style={[styles.input, { color: colors.text.primary }]}
+              placeholderTextColor={colors.text.secondary}
+            />
+            <TextInput
+              placeholder="Color"
+              value={categoryForm.color}
+              onChangeText={(v) => setCategoryForm((p) => ({ ...p, color: v }))}
+              style={[styles.input, { color: colors.text.primary }]}
+              placeholderTextColor={colors.text.secondary}
+            />
+            <TextInput
+              placeholder="Minimum question count"
+              value={categoryForm.min_question_count}
+              onChangeText={(v) => setCategoryForm((p) => ({ ...p, min_question_count: v }))}
+              keyboardType="numeric"
+              style={[styles.input, { color: colors.text.primary }]}
+              placeholderTextColor={colors.text.secondary}
+            />
             <View style={styles.switchRow}>
-              <Text style={[styles.label, { color: colors.text.secondary, marginBottom: 0 }]}>
-                Active
-              </Text>
-              <Switch value={isActive} onValueChange={setIsActive} />
+              <Text style={{ color: colors.text.primary, fontWeight: '600' }}>Enabled</Text>
+              <Switch
+                value={categoryForm.is_enabled}
+                onValueChange={(v) => setCategoryForm((p) => ({ ...p, is_enabled: v }))}
+                trackColor={{ false: '#CBD5E1', true: colors.primary }}
+              />
             </View>
-
-            <Pressable
-              style={[
-                styles.submitButton,
-                { backgroundColor: colors.primary, opacity: isSubmitting ? 0.7 : 1 },
-              ]}
-              onPress={handleSaveQuestion}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.submitText}>
-                  {editingQuestionId ? 'Update Question' : 'Save Question'}
-                </Text>
-              )}
-            </Pressable>
+            <View style={styles.modalActions}>
+              <Pressable
+                onPress={() => setCategoryModal(false)}
+                style={[styles.modalBtn, { backgroundColor: '#CBD5E1' }]}
+              >
+                <Text style={[styles.modalBtnText, { color: '#111827' }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={saveCategory}
+                style={[styles.modalBtn, { backgroundColor: colors.primary }]}
+              >
+                <Text style={styles.modalBtnText}>Save</Text>
+              </Pressable>
+            </View>
           </ScrollView>
         </View>
       </Modal>
-    </View>
+
+      <Modal
+        visible={quizModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setQuizModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
+              {editingQuiz ? 'Edit quiz' : 'Create quiz'}
+            </Text>
+            <TextInput
+              placeholder="Title"
+              value={quizForm.title}
+              onChangeText={(v) => setQuizForm((p) => ({ ...p, title: v }))}
+              style={[styles.input, { color: colors.text.primary }]}
+              placeholderTextColor={colors.text.secondary}
+            />
+            <TextInput
+              placeholder="Title (FR)"
+              value={quizForm.title_fr}
+              onChangeText={(v) => setQuizForm((p) => ({ ...p, title_fr: v }))}
+              style={[styles.input, { color: colors.text.primary }]}
+              placeholderTextColor={colors.text.secondary}
+            />
+            <TextInput
+              placeholder="Difficulty (easy/medium/hard)"
+              value={quizForm.difficulty}
+              onChangeText={(v) => setQuizForm((p) => ({ ...p, difficulty: v }))}
+              style={[styles.input, { color: colors.text.primary }]}
+              placeholderTextColor={colors.text.secondary}
+            />
+            <View style={styles.switchRow}>
+              <Text style={{ color: colors.text.primary, fontWeight: '600' }}>Enabled</Text>
+              <Switch
+                value={quizForm.is_enabled}
+                onValueChange={(v) => setQuizForm((p) => ({ ...p, is_enabled: v }))}
+                trackColor={{ false: '#CBD5E1', true: colors.primary }}
+              />
+            </View>
+            <View style={styles.modalActions}>
+              <Pressable
+                onPress={() => setQuizModal(false)}
+                style={[styles.modalBtn, { backgroundColor: '#CBD5E1' }]}
+              >
+                <Text style={[styles.modalBtnText, { color: '#111827' }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={saveQuiz}
+                style={[styles.modalBtn, { backgroundColor: colors.primary }]}
+              >
+                <Text style={styles.modalBtnText}>Save</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={questionModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setQuestionModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <ScrollView style={styles.modalCard} contentContainerStyle={{ gap: 10 }}>
+            <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
+              {editingQuestion ? 'Edit question' : 'Create question'}
+            </Text>
+            <TextInput
+              placeholder="Question"
+              value={questionForm.question}
+              onChangeText={(v) => setQuestionForm((p) => ({ ...p, question: v }))}
+              style={[styles.input, { color: colors.text.primary }]}
+              placeholderTextColor={colors.text.secondary}
+            />
+            <TextInput
+              placeholder="Question (FR)"
+              value={questionForm.question_fr}
+              onChangeText={(v) => setQuestionForm((p) => ({ ...p, question_fr: v }))}
+              style={[styles.input, { color: colors.text.primary }]}
+              placeholderTextColor={colors.text.secondary}
+            />
+            {questionForm.options.map((option, index) => (
+              <TextInput
+                key={`option-${index}`}
+                placeholder={`Option ${index + 1}`}
+                value={option}
+                onChangeText={(value) =>
+                  setQuestionForm((prev) => {
+                    const nextOptions = [...prev.options];
+                    nextOptions[index] = value;
+                    return { ...prev, options: nextOptions };
+                  })
+                }
+                style={[styles.input, { color: colors.text.primary }]}
+                placeholderTextColor={colors.text.secondary}
+              />
+            ))}
+            <TextInput
+              placeholder="Correct option index (0-3)"
+              value={questionForm.correctIndex}
+              onChangeText={(v) => setQuestionForm((p) => ({ ...p, correctIndex: v }))}
+              keyboardType="numeric"
+              style={[styles.input, { color: colors.text.primary }]}
+              placeholderTextColor={colors.text.secondary}
+            />
+            <View style={styles.switchRow}>
+              <Text style={{ color: colors.text.primary, fontWeight: '600' }}>Active</Text>
+              <Switch
+                value={questionForm.is_active}
+                onValueChange={(v) => setQuestionForm((p) => ({ ...p, is_active: v }))}
+                trackColor={{ false: '#CBD5E1', true: colors.primary }}
+              />
+            </View>
+            <View style={styles.modalActions}>
+              <Pressable
+                onPress={() => setQuestionModal(false)}
+                style={[styles.modalBtn, { backgroundColor: '#CBD5E1' }]}
+              >
+                <Text style={[styles.modalBtnText, { color: '#111827' }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={saveQuestion}
+                style={[styles.modalBtn, { backgroundColor: colors.primary }]}
+              >
+                <Text style={styles.modalBtnText}>Save</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
+    </AdminScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    padding: 4,
-  },
-  refreshButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  selectorSection: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 8,
+  selectorRow: {
     gap: 8,
+  },
+  selector: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 8,
+    gap: 8,
+    backgroundColor: '#FFFFFF',
   },
   selectorLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  selectorChips: {
-    gap: 8,
-    paddingBottom: 4,
-  },
-  chip: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  listContent: {
-    padding: 16,
-    paddingBottom: 110,
-    gap: 10,
-  },
-  card: {
-    borderRadius: 12,
-    padding: 14,
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  cardActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  statusPill: {
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  questionText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  questionFrText: {
-    marginTop: 4,
-    fontSize: 13,
-  },
-  answersList: {
-    marginTop: 10,
-    gap: 4,
-  },
-  answerText: {
-    fontSize: 13,
-  },
-  fab: {
-    position: 'absolute',
-    right: 22,
-    bottom: 30,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-  },
-  modalContainer: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 14,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  modalTitle: {
-    fontSize: 20,
+    fontSize: 12,
     fontWeight: '700',
   },
-  label: {
-    marginBottom: 8,
-    marginTop: 8,
-    fontSize: 13,
-    fontWeight: '600',
+  selectorChip: {
+    minHeight: 30,
+    borderRadius: 15,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  quizTitleValue: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 6,
+  card: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    gap: 10,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  cardMeta: {
+    fontSize: 12,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  btn: {
+    minHeight: 34,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 16,
+    maxHeight: '90%',
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderRadius: 10,
+    borderColor: '#DEE5EF',
+    borderRadius: 12,
+    height: 44,
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    marginBottom: 10,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  optionInput: {
-    flex: 1,
-    marginBottom: 0,
-  },
-  radio: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    fontSize: 14,
   },
   switchRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 10,
+    justifyContent: 'space-between',
   },
-  submitButton: {
+  modalActions: {
     marginTop: 8,
-    paddingVertical: 14,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  modalBtn: {
+    flex: 1,
+    height: 42,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  submitText: {
-    color: '#fff',
-    fontSize: 16,
+  modalBtnText: {
+    color: '#FFFFFF',
     fontWeight: '700',
   },
 });

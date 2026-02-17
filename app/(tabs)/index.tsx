@@ -19,8 +19,8 @@ import { PrayerBanner } from '@/components/prayer/PrayerBanner';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
 import { getReadingProgress, ReadingProgress } from '@/services/quranProgress';
-import { socialService } from '@/services/socialService';
-import { useAppSelector } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { fetchNotifications } from '@/store/slices/notificationsSlice';
 
 export default function HomeScreen() {
   const { t } = useTranslation();
@@ -28,6 +28,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { colors, isDark } = useTheme();
+  const dispatch = useAppDispatch();
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
 
   const fontRegular = getFont(currentLanguage, 'regular');
@@ -38,7 +39,7 @@ export default function HomeScreen() {
   const [locationCoords, setLocationCoords] = useState<{ lat: number; lng: number } | undefined>(
     undefined
   );
-  const [notificationCount, setNotificationCount] = useState(0);
+  const notificationCount = useAppSelector((s) => s.notifications.unreadCount);
   const [readingProgress, setReadingProgress] = useState<ReadingProgress | null>(null);
   const userData = useAppSelector((state) => state.user);
 
@@ -71,32 +72,13 @@ export default function HomeScreen() {
     }, [])
   );
 
-  // Fetch unread notifications count when screen is focused
+  // Fetch notifications count when screen is focused
   useFocusEffect(
     useCallback(() => {
-      let isActive = true;
-
-      const fetchUnreadCount = async () => {
-        try {
-          if (!userData.isAuthenticated) {
-            if (isActive) setNotificationCount(0);
-            return;
-          }
-
-          const count = await socialService.getUnreadNotificationsCount();
-          if (isActive) setNotificationCount(count);
-        } catch (error) {
-          console.error('Failed to fetch unread notifications count:', error);
-          if (isActive) setNotificationCount(0);
-        }
-      };
-
-      fetchUnreadCount();
-
-      return () => {
-        isActive = false;
-      };
-    }, [userData.isAuthenticated])
+      if (userData.isAuthenticated) {
+        dispatch(fetchNotifications());
+      }
+    }, [userData.isAuthenticated, dispatch])
   );
 
   const handleContinueReading = () => {
@@ -136,34 +118,6 @@ export default function HomeScreen() {
           )}
         </Pressable>
 
-        <Pressable
-          onPress={() => router.push('/search')}
-          style={[
-            styles.searchBar,
-            { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
-          ]}
-        >
-          <Ionicons
-            name="search-outline"
-            size={18}
-            color={colors.text.secondary}
-            style={styles.searchIcon}
-          />
-          <Text
-            style={[
-              styles.searchPlaceholder,
-              { fontFamily: fontRegular, color: colors.text.secondary },
-            ]}
-          >
-            {t('common.search')}
-          </Text>
-          <Ionicons
-            name="mic-outline"
-            size={18}
-            color={colors.text.secondary}
-            style={styles.micIcon}
-          />
-        </Pressable>
 
         <Pressable onPress={() => router.push('/notifications')} style={styles.notificationButton}>
           <Ionicons name="mail-outline" size={24} color={colors.text.primary} />
@@ -209,7 +163,7 @@ export default function HomeScreen() {
                 : t('quran.startReading')}
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+          <Ionicons name="chevron-forward" size={20} color={colors.text.secondary} />
         </View>
       </Pressable>
     </View>
@@ -242,6 +196,7 @@ const styles = StyleSheet.create({
   topHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 12,
     marginBottom: 12,
   },

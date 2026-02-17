@@ -134,6 +134,8 @@ export default function CreatePostScreen() {
   const [selectedMosque, setSelectedMosque] = useState<any | null>(null);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
+  const isRequestSubmission = !isAdmin && (postType === 'janaza' || postType === 'sick_visit');
+
   useEffect(() => {
     loadMosques();
   }, []);
@@ -459,7 +461,7 @@ export default function CreatePostScreen() {
              <View style={{ marginTop: 20 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                      <Ionicons name="location-outline" size={24} color={colors.text.primary} />
-                     <Text style={{ fontSize: 16, fontFamily: fontMedium, color: colors.text.primary }}>Lieu de l'enterrement</Text>
+                     <Text style={{ fontSize: 16, fontFamily: fontMedium, color: colors.text.primary }}>Lieu de l&apos;enterrement</Text>
                  </View>
                  <TextInput
                      style={[styles.simpleInput, { color: colors.text.primary, borderBottomWidth: 1, borderBottomColor: colors.border }]}
@@ -903,8 +905,16 @@ export default function CreatePostScreen() {
 
       <SuccessModal
         visible={successModalVisible}
-        title="Succès"
-        message={t('feed.postCreated')}
+        title={
+          isRequestSubmission
+            ? t('feed.requestSubmittedTitle')
+            : t('common.success')
+        }
+        message={
+          isRequestSubmission
+            ? t('feed.requestSubmittedMessage')
+            : t('feed.postCreated')
+        }
         onConfirm={() => {
             setSuccessModalVisible(false);
             router.back();

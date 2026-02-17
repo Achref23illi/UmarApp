@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -453,19 +454,19 @@ export default function QuizGameScreen() {
       const nextAnswers = hasAnswer
         ? prev.snapshot.answers
         : [
-            ...prev.snapshot.answers,
-            {
-              id: `local-${input.sessionId}-${input.playerId}-${input.questionIndex}`,
-              session_id: input.sessionId,
-              player_id: input.playerId,
-              question_id: input.questionId,
-              question_index: input.questionIndex,
-              selected_answer: input.selectedAnswer,
-              is_correct: input.isCorrect,
-              response_ms: input.responseMs,
-              answered_at: new Date().toISOString(),
-            },
-          ];
+          ...prev.snapshot.answers,
+          {
+            id: `local-${input.sessionId}-${input.playerId}-${input.questionIndex}`,
+            session_id: input.sessionId,
+            player_id: input.playerId,
+            question_id: input.questionId,
+            question_index: input.questionIndex,
+            selected_answer: input.selectedAnswer,
+            is_correct: input.isCorrect,
+            response_ms: input.responseMs,
+            answered_at: new Date().toISOString(),
+          },
+        ];
 
       const nextPlayers = prev.snapshot.players.map((player) =>
         player.id === input.playerId ? { ...player, score: input.score } : player
@@ -499,10 +500,10 @@ export default function QuizGameScreen() {
           players: prev.snapshot.players.map((player) =>
             player.id === input.playerId
               ? {
-                  ...player,
-                  jokers_left: input.jokersLeft,
-                  helps_left: input.helpsLeft,
-                }
+                ...player,
+                jokers_left: input.jokersLeft,
+                helps_left: input.helpsLeft,
+              }
               : player
           ),
         },
@@ -574,7 +575,7 @@ export default function QuizGameScreen() {
       Math.floor(
         (new Date(finalSession.finishedAt || new Date().toISOString()).getTime() -
           new Date(finalSession.startedAt).getTime()) /
-          1000
+        1000
       )
     );
 
@@ -772,9 +773,9 @@ export default function QuizGameScreen() {
       const responseMs = Math.max(
         0,
         Date.now() -
-          new Date(
-            gameState.snapshot.session.question_started_at || new Date().toISOString()
-          ).getTime()
+        new Date(
+          gameState.snapshot.session.question_started_at || new Date().toISOString()
+        ).getTime()
       );
 
       const result = await quizSessionService.submitAnswer(
@@ -1016,6 +1017,14 @@ export default function QuizGameScreen() {
       </View>
 
       <View style={styles.questionSection}>
+        {currentQuestion.imageUrl && (
+          <Image
+            source={{ uri: currentQuestion.imageUrl }}
+            style={styles.questionImage}
+            contentFit="contain"
+            transition={200}
+          />
+        )}
         <Text
           style={[styles.questionText, { fontFamily: fontRegular, color: colors.text.primary }]}
         >
@@ -1392,6 +1401,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 28,
     marginBottom: 22,
+  },
+  questionImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    marginBottom: 16,
+    backgroundColor: 'transparent',
   },
   optionsContainer: {
     gap: 12,

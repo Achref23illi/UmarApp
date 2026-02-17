@@ -284,6 +284,10 @@
   "feed": {
     "addedToAgenda": "تمت الإضافة إلى الأجندة",
     "removedFromAgenda": "تمت الإزالة من الأجندة",
+    "postCreated": "تم إنشاء المنشور بنجاح",
+    "requestSubmittedTitle": "تم إرسال الطلب",
+    "requestSubmittedMessage": "تم إرسال طلبك إلى المشرف وسيتم نشره بعد المراجعة.",
+    "postFailed": "فشل إنشاء المنشور",
     "pinned": "تم التثبيت في الأعلى",
     "unpinned": "تم إلغاء التثبيت",
     "commentsReviewedByAdmin": "التعليقات تخضع لمراجعة المشرف.",

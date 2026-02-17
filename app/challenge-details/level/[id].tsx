@@ -1,4 +1,3 @@
-
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -19,7 +18,12 @@ import { Colors } from '@/config/colors';
 import { ChallengeLevelNumber, QURAN_PLANS, SADAQA_PLANS, clampDay, getPlanForDay } from '@/config/challengeContent';
 import { getFont } from '@/hooks/use-fonts';
 import { useTheme } from '@/hooks/use-theme';
-import { ChallengeLevel, ChallengeLevelDashboard, challengeDetailsService } from '@/services/challengeDetailsService';
+import {
+  ChallengeLevel,
+  ChallengeLevelDashboard,
+  ChallengeQuranDayPlan,
+  challengeDetailsService,
+} from '@/services/challengeDetailsService';
 import { challengeService } from '@/services/challengeService';
 import { SURAHS } from '@/services/quranData';
 import { useAppSelector } from '@/store/hooks';
@@ -60,6 +64,7 @@ export default function LevelDashboardScreen() {
   const [resolvedChallengeSlug, setResolvedChallengeSlug] = useState<string>(slugParam);
   const [advanceBadge, setAdvanceBadge] = useState<AdvanceBadgeState | null>(null);
   const [quranTodayStatus, setQuranTodayStatus] = useState<QuranTodayStatus | null>(null);
+  const [quranPlans, setQuranPlans] = useState<ChallengeQuranDayPlan[]>([]);
 
   const challengeKind = resolvedChallengeSlug || slugParam;
 
@@ -70,12 +75,15 @@ export default function LevelDashboardScreen() {
         setDashboard(null);
         setResolvedChallengeSlug(slugParam);
         setQuranTodayStatus(null);
+        setQuranPlans([]);
         setIsLoading(false);
         return;
       }
 
       setIsLoading(true);
       setLoadError(null);
+      setQuranTodayStatus(null);
+      setQuranPlans([]);
 
       const [lvl, dash] = await Promise.all([
         challengeDetailsService.getLevelById(levelId),
@@ -90,14 +98,18 @@ export default function LevelDashboardScreen() {
       }
 
       let nextQuranStatus: QuranTodayStatus | null = null;
+      let nextQuranPlans: ChallengeQuranDayPlan[] = [];
       if (lvl && nextSlug === 'quran') {
+        nextQuranPlans = await challengeDetailsService.getQuranPlanForLevel(lvl.id);
         const levelNumber = (lvl.levelNumber ?? 1) as ChallengeLevelNumber;
-        const plans = QURAN_PLANS[levelNumber] ?? [];
+        const fallbackPlans = QURAN_PLANS[levelNumber] ?? [];
         const duration = lvl.durationDays ?? 0;
+        const totalPlanDays = duration || Math.max(nextQuranPlans.length, fallbackPlans.length) || 1;
         const computedDay = duration
           ? clampDay(Math.max(0, duration - (dash?.daysLeft ?? duration)) + 1, duration)
           : 1;
-        const plan = getPlanForDay(plans, computedDay);
+        const day = clampDay(computedDay, totalPlanDays);
+        const plan = getPlanForDay(nextQuranPlans, day) ?? getPlanForDay(fallbackPlans, day);
         const requiredSurahs = [
           ...new Set(
             (plan?.surahs ?? []).filter(
@@ -129,6 +141,7 @@ export default function LevelDashboardScreen() {
       setLevel(lvl);
       setDashboard(dash);
       setQuranTodayStatus(nextQuranStatus);
+      setQuranPlans(nextQuranPlans);
       setSelectedDay(6);
     } catch (error) {
       console.error('Failed to load level dashboard:', error);
@@ -136,6 +149,7 @@ export default function LevelDashboardScreen() {
       setLevel(null);
       setDashboard(null);
       setQuranTodayStatus(null);
+      setQuranPlans([]);
     } finally {
       setIsLoading(false);
     }
@@ -159,10 +173,11 @@ export default function LevelDashboardScreen() {
 
   const quranPlanToday = useMemo(() => {
     if (challengeKind !== 'quran') return null;
-    const plans = QURAN_PLANS[levelNumber] ?? [];
-    const d = clampDay(currentDayNumber, plans.length || 1);
-    return getPlanForDay(plans, d);
-  }, [challengeKind, levelNumber, currentDayNumber]);
+    const fallbackPlans = QURAN_PLANS[levelNumber] ?? [];
+    const maxDays = level?.durationDays || Math.max(quranPlans.length, fallbackPlans.length) || 1;
+    const d = clampDay(currentDayNumber, maxDays);
+    return getPlanForDay(quranPlans, d) ?? getPlanForDay(fallbackPlans, d);
+  }, [challengeKind, levelNumber, currentDayNumber, level?.durationDays, quranPlans]);
 
   const sadaqaPlanToday = useMemo(() => {
     if (challengeKind !== 'sadaqa') return null;

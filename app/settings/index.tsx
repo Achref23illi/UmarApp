@@ -3,21 +3,25 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { useNavigation } from '@react-navigation/native';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/hooks/use-theme';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setLanguage } from '@/store/slices/languageSlice'; // Assuming this exists or will need to create
+import { logoutUser } from '@/store/slices/userSlice';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
   const userData = useAppSelector((state) => state.user);
+  const canGoBack = navigation.canGoBack();
 
   const languages = [
     { code: 'en', label: 'English' },
@@ -54,15 +58,20 @@ export default function SettingsScreen() {
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
+      contentContainerStyle={[
+        styles.content,
+        { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 },
+      ]}
     >
       {/* Back Button */}
-      <Pressable
-        onPress={() => router.back()}
-        style={[styles.backButton, { backgroundColor: colors.surface }]}
-      >
-        <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
-      </Pressable>
+      {canGoBack ? (
+        <Pressable
+          onPress={() => router.back()}
+          style={[styles.backButton, { backgroundColor: colors.surface }]}
+        >
+          <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
+        </Pressable>
+      ) : null}
 
       {/* Profile Header */}
       <View style={styles.profileHeader}>
@@ -87,28 +96,6 @@ export default function SettingsScreen() {
       </View>
 
       {/* Premium Banner */}
-      <Pressable
-        onPress={() => router.push('/settings/subscription')}
-        style={[styles.premiumBanner, { marginHorizontal: 16, marginBottom: 8 }]} // Added marginHorizontal
-      >
-        <LinearGradient
-          colors={['#8B3DB8', '#5D2E86']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.premiumGradient}
-        >
-          <View style={styles.premiumContent}>
-            <View style={styles.premiumIconContainer}>
-              <Ionicons name="star" size={24} color="#FFD700" />
-            </View>
-            <View style={styles.premiumTextContainer}>
-              <Text style={styles.premiumTitle}>Umar Premium</Text>
-              <Text style={styles.premiumSubtitle}>Débloquez tout le potentiel</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={24} color="#FFF" />
-          </View>
-        </LinearGradient>
-      </Pressable>
 
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.text.secondary }]}>Général</Text>
@@ -150,6 +137,29 @@ export default function SettingsScreen() {
           </Pressable>
         ))}
       </View>
+
+      {/* Sign Out */}
+      {userData.isAuthenticated ? (
+        <Pressable
+          onPress={async () => {
+            await dispatch(logoutUser());
+            router.replace('/welcome');
+          }}
+          style={({ pressed }) => [
+            styles.logoutButton,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              opacity: pressed ? 0.7 : 1,
+            },
+          ]}
+        >
+          <View style={[styles.iconContainer, { backgroundColor: 'rgba(229,57,53,0.12)' }]}>
+            <Ionicons name="log-out-outline" size={22} color="#E53935" />
+          </View>
+          <Text style={[styles.menuLinkText, { color: '#E53935' }]}>{t('profile.signOut')}</Text>
+        </Pressable>
+      ) : null}
     </ScrollView>
   );
 }
@@ -257,6 +267,16 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '500',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 12,
+    marginHorizontal: 16,
+    marginTop: 4,
   },
   badge: {
     paddingHorizontal: 8,
