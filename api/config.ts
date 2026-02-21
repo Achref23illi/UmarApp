@@ -5,7 +5,7 @@
  */
 
 // Environment variables (will be set in .env files)
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://umarapp-backend.onrender.com/api';
 const API_TIMEOUT = Number(process.env.EXPO_PUBLIC_API_TIMEOUT) || 30000;
 
 export const ApiConfig = {

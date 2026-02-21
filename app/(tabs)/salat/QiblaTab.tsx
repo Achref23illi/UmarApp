@@ -128,8 +128,8 @@ export function QiblaTab() {
       positionSubscriptionRef.current = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.Balanced,
-          distanceInterval: 5,
-          timeInterval: 5000,
+          distanceInterval: 10,  // Reduced frequency for performance
+          timeInterval: 10000,   // Check at most every 10 seconds
         },
         (nextPosition) => {
           updateQiblaFromCoordinates(nextPosition.coords.latitude, nextPosition.coords.longitude);
@@ -143,11 +143,17 @@ export function QiblaTab() {
         });
         setHasCompassHeading(true);
       } catch (headingError) {
-        console.warn('Heading subscription unavailable', headingError);
-        const currentHeading = await Location.getHeadingAsync();
-        setHeading(resolveHeading(currentHeading));
-        setHeadingAccuracy(Number(currentHeading.accuracy || 0));
-        setHasCompassHeading(false);
+        console.warn('Heading subscription unavailable or running on emulator', headingError);
+        // Emulators often do not support compass events.
+        try {
+          const currentHeading = await Location.getHeadingAsync();
+          setHeading(resolveHeading(currentHeading));
+          setHeadingAccuracy(Number(currentHeading.accuracy || 0));
+          setHasCompassHeading(true); // Treat one-off success as having heading
+        } catch (e) {
+          setHasCompassHeading(false);
+          setHeading(0); // Fallback to north
+        }
       }
     } catch (err) {
       console.error('Qibla error:', err);
@@ -184,9 +190,9 @@ export function QiblaTab() {
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return Math.round(R * c);
   };

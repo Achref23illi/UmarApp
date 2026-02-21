@@ -5,11 +5,11 @@ import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,7 +30,7 @@ const QURAN_EDITIONS: QuranEdition[] = [
     id: 'mushaf',
     icon: 'book',
     color: '#10B981',
-    route: '/quran/surahs',
+    route: '/quran/mushaf',
   },
   {
     id: 'french',
@@ -58,7 +58,7 @@ export default function QuranLibraryScreen() {
 
   const renderEditionCard = (edition: QuranEdition, index: number) => {
     return (
-      <Animated.View 
+      <Animated.View
         key={edition.id}
         entering={FadeInUp.delay(200 + index * 150).duration(500)}
       >
@@ -79,7 +79,7 @@ export default function QuranLibraryScreen() {
             <View style={styles.editionIconContainer}>
               <Ionicons name={edition.icon as any} size={48} color="#FFF" />
             </View>
-            
+
             {/* Content */}
             <View style={styles.editionContent}>
               <Text style={[styles.editionTitle, { fontFamily: fontBold }]}>
@@ -92,7 +92,7 @@ export default function QuranLibraryScreen() {
                 {t(`quran.editions.${edition.id}.description`)}
               </Text>
             </View>
-            
+
             {/* Arrow */}
             <View style={styles.editionArrow}>
               <Ionicons name="chevron-forward" size={24} color="rgba(255,255,255,0.8)" />
@@ -117,7 +117,7 @@ export default function QuranLibraryScreen() {
         <View style={styles.backButton} />
       </View>
 
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
@@ -137,7 +137,7 @@ export default function QuranLibraryScreen() {
         </View>
 
         {/* Info Card */}
-        <Animated.View 
+        <Animated.View
           entering={FadeInUp.delay(600)}
           style={[styles.infoCard, { backgroundColor: colors.surface }]}
         >

@@ -48,7 +48,9 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
       {/* Logo + Slogan */}
       <Animated.View entering={ZoomIn.duration(800)} style={styles.centerContent}>
         <Image source={Images.logo} style={styles.logo} contentFit="contain" />
-        <Text style={styles.slogan}>Les portes du bien</Text>
+        <Text style={styles.slogan} numberOfLines={1} adjustsFontSizeToFit>
+          Les portes du bien
+        </Text>
       </Animated.View>
     </Animated.View>
   );

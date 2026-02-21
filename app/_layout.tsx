@@ -31,7 +31,7 @@ function ThemedApp() {
   const { fontsLoaded, fontError } = useAppFonts();
   const [isSplashFinished, setIsSplashFinished] = useState(false);
   const currentLanguage = useAppSelector((state) => state.language.currentLanguage);
-  
+
   // Auth & Navigation
   const { isAuthenticated, isAdmin, isLoading: isUserLoading } = useAppSelector((state) => state.user);
   const segments = useSegments();
@@ -74,7 +74,7 @@ function ThemedApp() {
   };
 
   if (fontError) {
-     console.error("Font loading error", fontError);
+    console.error("Font loading error", fontError);
   }
 
   // Create Navigation Theme based on our colors
@@ -111,14 +111,19 @@ function ThemedApp() {
               }}
             />
             {/* New Settings Screen */}
+            <Stack.Screen name="quran/index" />
+            <Stack.Screen name="quran/mushaf" />
+            <Stack.Screen name="quran/surahs" />
+            <Stack.Screen name="quran/french-reader" />
+            <Stack.Screen name="quran/french-surahs" />
             <Stack.Screen
-              name="settings"
+              name="settings/index"
               options={{
-                presentation: 'card', 
+                presentation: 'card',
                 headerShown: true,
                 title: 'Settings',
-                 headerStyle: { backgroundColor: colors.surface },
-                 headerTintColor: colors.text.primary,
+                headerStyle: { backgroundColor: colors.surface },
+                headerTintColor: colors.text.primary,
               }}
             />
           </Stack>
@@ -140,7 +145,7 @@ export default function RootLayout() {
         <SafeAreaProvider>
           <Provider store={store}>
             <QueryProvider>
-               <ThemedApp />
+              <ThemedApp />
             </QueryProvider>
           </Provider>
         </SafeAreaProvider>

@@ -127,19 +127,14 @@ export default function WelcomeScreen() {
     <View style={styles.container}>
       {/* Top Bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
-        {/* Language Switcher */}
-        <Pressable onPress={cycleLanguage} style={styles.langButton}>
-          <Ionicons name="globe-outline" size={20} color={PRIMARY} />
-          <Text style={[styles.langText, { fontFamily: fontMedium, color: GRAY_TEXT }]}>
-            {languageLabels[currentLanguage]}
-          </Text>
-        </Pressable>
+        {/* Placeholder for balance */}
+        <View style={{ width: 60 }} />
 
         {/* Centered Logo */}
-        <Image 
-          source={Images.logo} 
-          style={styles.logoTop} 
-          contentFit="contain" 
+        <Image
+          source={Images.logo}
+          style={styles.logoTop}
+          contentFit="contain"
         />
 
         {/* Skip Button */}
@@ -175,10 +170,10 @@ export default function WelcomeScreen() {
                   <Image source={item.illustration} style={styles.illustration} contentFit="contain" />
                 </View>
                 {/* Text */}
-                <Text style={[styles.title, { fontFamily: fontBold, color: GRAY_TEXT }]}>
+                <Text style={[styles.title, { fontFamily: fontBold, color: GRAY_TEXT }]} adjustsFontSizeToFit numberOfLines={2}>
                   {t(`welcome.slides.${item.translationKey}.title`)}
                 </Text>
-                <Text style={[styles.subtitle, { fontFamily: fontRegular, color: GRAY_LIGHT }]}>
+                <Text style={[styles.subtitle, { fontFamily: fontRegular, color: GRAY_LIGHT }]} adjustsFontSizeToFit numberOfLines={3}>
                   {t(`welcome.slides.${item.translationKey}.subtitle`)}
                 </Text>
               </View>
@@ -197,7 +192,7 @@ export default function WelcomeScreen() {
 
           {/* Next/Get Started Button */}
           <Pressable onPress={handleNext} style={styles.nextButton}>
-            <Text style={[styles.nextButtonText, { fontFamily: fontSemiBold }]}>
+            <Text style={[styles.nextButtonText, { fontFamily: fontSemiBold }]} adjustsFontSizeToFit numberOfLines={1}>
               {currentIndex === slides.length - 1 ? t('welcome.getStarted') : t('welcome.next')}
             </Text>
             <Ionicons
@@ -210,7 +205,7 @@ export default function WelcomeScreen() {
           {/* Login Link */}
           <Animated.View entering={FadeInDown.delay(500)}>
             <Pressable onPress={() => router.push('/auth/login')} style={styles.loginLink}>
-              <Text style={[styles.loginText, { fontFamily: fontRegular, color: PRIMARY }]}>
+              <Text style={[styles.loginText, { fontFamily: fontRegular, color: PRIMARY }]} adjustsFontSizeToFit numberOfLines={1}>
                 {t('welcome.alreadyHaveAccount')}
               </Text>
             </Pressable>
@@ -274,17 +269,19 @@ const styles = StyleSheet.create({
   },
   slide: {
     flex: 1,
-    paddingTop: 100,
-  },
-  slideContent: {
-    alignItems: 'center',
-    paddingHorizontal: 24,
     paddingTop: 20,
   },
+  slideContent: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    justifyContent: 'center',
+  },
   illustrationContainer: {
-    width: SCREEN_WIDTH * 0.85,
-    height: SCREEN_WIDTH * 0.85,
-    marginBottom: 40,
+    flex: 1,
+    width: '100%',
+    maxHeight: SCREEN_WIDTH * 0.85,
+    marginBottom: 30,
     alignItems: 'center',
     justifyContent: 'center',
   },

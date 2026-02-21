@@ -11,7 +11,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, SafeAreaView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Socket } from 'socket.io-client';
 
-const SOCKET_URL = 'http://192.168.1.16:3000'; // Replace with your backend URL
+const SOCKET_URL = process.env.EXPO_PUBLIC_API_URL?.replace('/api', '') || 'https://umarapp-backend.onrender.com';
 
 export default function ChallengeScreen() {
   const router = useRouter();

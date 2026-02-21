@@ -64,9 +64,9 @@ export function CustomTabBar({ state, navigation }: CustomTabBarProps) {
     // Find route index in state
     const tabIndex = state.routes.findIndex(r => r.name === routeName);
     if (tabIndex === -1) {
-        // If route not found in state (shouldn't happen for active tabs), just navigate
-       navigation.navigate(routeName);
-       return;
+      // If route not found in state (shouldn't happen for active tabs), just navigate
+      navigation.navigate(routeName);
+      return;
     }
 
     const event = navigation.emit({
@@ -83,48 +83,49 @@ export function CustomTabBar({ state, navigation }: CustomTabBarProps) {
 
   // Helper to check if tab is active
   const isFocused = (name: string) => {
-      const currentRoute = state.routes[state.index];
-      return currentRoute?.name === name;
+    const currentRoute = state.routes[state.index];
+    return currentRoute?.name === name;
   };
 
   return (
-    <View 
+    <View
       style={[
-        styles.container, 
-        { 
+        styles.container,
+        {
           bottom: 0,
           backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
           shadowColor: isDark ? '#000' : '#8B3DB8',
           borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'transparent',
           borderWidth: isDark ? 1 : 0,
+          paddingBottom: Math.max(insets.bottom, 10),
         }
       ]}
     >
       <View style={styles.tabBar}>
-          {TABS.map((tab) => {
-              const focused = isFocused(tab.name);
-              return (
-                  <Pressable
-                      key={tab.name}
-                      style={styles.tabItem}
-                      onPress={() => handleTabPress(tab.name)}
-                  >
-                      <Ionicons
-                          name={focused ? tab.icon : tab.iconOutline}
-                          size={22}
-                          color={focused ? colors.primary : (isDark ? colors.gray[400] : '#9CA3AF')}
-                      />
-                      <Text
-                          style={[
-                              styles.tabLabel,
-                              { color: focused ? colors.primary : (isDark ? colors.gray[400] : '#9CA3AF') },
-                          ]}
-                      >
-                          {tab.label}
-                      </Text>
-                  </Pressable>
-              );
-          })}
+        {TABS.map((tab) => {
+          const focused = isFocused(tab.name);
+          return (
+            <Pressable
+              key={tab.name}
+              style={styles.tabItem}
+              onPress={() => handleTabPress(tab.name)}
+            >
+              <Ionicons
+                name={focused ? tab.icon : tab.iconOutline}
+                size={22}
+                color={focused ? colors.primary : (isDark ? colors.gray[400] : '#9CA3AF')}
+              />
+              <Text
+                style={[
+                  styles.tabLabel,
+                  { color: focused ? colors.primary : (isDark ? colors.gray[400] : '#9CA3AF') },
+                ]}
+              >
+                {tab.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
     </View>
   );
