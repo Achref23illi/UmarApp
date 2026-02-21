@@ -13,7 +13,8 @@
     "dashboard:dev": "cd ../dashboard-web && npm run dev",
     "lint": "expo lint",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
-    "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,md}\""
+    "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@expo-google-fonts/cairo": "^0.4.2",
@@ -54,6 +55,7 @@
     "expo-web-browser": "~15.0.10",
     "i18next": "^25.7.2",
     "nativewind": "^4.2.1",
+    "patch-package": "^8.0.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-hook-form": "^7.68.0",

@@ -1,0 +1,12 @@
+diff --git a/node_modules/react-native-dynamic-fonts/android/build.gradle b/node_modules/react-native-dynamic-fonts/android/build.gradle
+index f83c995..f81b055 100644
+--- a/node_modules/react-native-dynamic-fonts/android/build.gradle
++++ b/node_modules/react-native-dynamic-fonts/android/build.gradle
+@@ -20,6 +20,5 @@ android {
+ }
+ 
+ dependencies {
+-    compile 'com.facebook.react:react-native:+'
++    implementation 'com.facebook.react:react-native:+'
+ }
+-
